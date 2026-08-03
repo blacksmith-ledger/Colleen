@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
-<title>Checkout Match v0.2</title>
+<title>Checkout Match v0.4</title>
 <style>
   :root{
     --bg:#f2eadf;
@@ -161,6 +161,104 @@
     background:#d94f3d;
     color:#fff;
   }
+
+  .ctrl.gobacks{background:#3c78d8;color:#fff;box-shadow:0 3px 0 #27539a}
+  .ctrl:disabled{opacity:.45;box-shadow:none}
+  .gobacks-overlay{
+    position:fixed; inset:0; z-index:20; display:none;
+    background:linear-gradient(#dbe9f4 0 50%, #c9b28f 50% 100%);
+    color:#222; overflow:auto; padding:max(12px,env(safe-area-inset-top)) 12px max(18px,env(safe-area-inset-bottom));
+  }
+  .gobacks-overlay.show{display:block}
+  .gb-wrap{width:min(100%,560px);margin:0 auto;text-align:center}
+  .gb-head{
+    display:grid;grid-template-columns:1fr auto 1fr;align-items:center;
+    background:#fffaf2;border:2px solid #bcae99;border-radius:16px;padding:8px 10px;margin-bottom:8px
+  }
+  .gb-head .left{text-align:left}.gb-head .right{text-align:right}
+  .gb-title{font-weight:950;font-size:22px}
+  .gb-sub{font-size:12px;font-weight:800;opacity:.65;text-transform:uppercase}
+  .gb-number{font-size:23px;font-weight:950}
+  .gb-scene{
+    position:relative;height:min(65vh,590px);min-height:510px;overflow:hidden;
+    border:3px solid #8d826f;border-radius:20px;
+    background:
+      linear-gradient(#e8f4ff 0 51%, #ddd0b9 51% 100%);
+    box-shadow:inset 0 -80px 0 rgba(0,0,0,.03)
+  }
+  .store-sign{
+    position:absolute;top:14px;left:50%;transform:translateX(-50%);
+    font-size:13px;font-weight:950;letter-spacing:1px;text-transform:uppercase;
+    background:#fff;padding:5px 11px;border:2px solid #999;border-radius:7px
+  }
+  .totes{
+    position:absolute;top:78px;left:10px;right:10px;
+    display:grid;grid-template-columns:repeat(4,1fr);gap:7px
+  }
+  .tote{
+    min-height:112px;border:0;border-radius:8px 8px 18px 18px;
+    background:linear-gradient(#7893a8,#49687f);
+    color:white;font-weight:950;font-size:11px;padding:8px 3px 5px;
+    box-shadow:inset 0 7px 0 #263d4e, 0 4px 0 rgba(0,0,0,.18);
+    position:relative;
+  }
+  .tote::before{
+    content:"";position:absolute;left:7px;right:7px;top:-7px;height:10px;
+    border-radius:7px;background:#2e4658
+  }
+  .tote.correct{animation:toteGood .36s}
+  .tote.wrong{animation:toteBad .36s}
+  @keyframes toteGood{50%{transform:scale(1.08)}}
+  @keyframes toteBad{25%,75%{transform:translateX(-5px)}50%{transform:translateX(5px)}}
+  .free-throw-line{
+    position:absolute;left:15%;right:15%;bottom:142px;height:4px;background:#f7f4e9;border-radius:4px;
+    box-shadow:0 0 0 1px rgba(0,0,0,.15)
+  }
+  .colleen{
+    position:absolute;left:50%;bottom:19px;transform:translateX(-50%);
+    width:108px;height:142px;
+  }
+  .pixel-head{
+    position:absolute;left:31px;top:0;width:47px;height:47px;background:#efc7a2;border-radius:13px;
+    box-shadow:inset 0 -4px rgba(0,0,0,.07)
+  }
+  .pixel-hair{
+    position:absolute;left:26px;top:-3px;width:57px;height:27px;background:#5b4337;border-radius:16px 16px 5px 5px
+  }
+  .pixel-body{
+    position:absolute;left:18px;top:43px;width:73px;height:70px;background:#287bc1;border-radius:10px 10px 18px 18px;
+    box-shadow:inset 12px 0 rgba(255,255,255,.08),inset -12px 0 rgba(0,0,0,.07)
+  }
+  .pixel-shirt{
+    position:absolute;left:34px;top:47px;width:41px;height:62px;background:#eee7dc;border-radius:5px
+  }
+  .pixel-leg{position:absolute;top:106px;width:24px;height:34px;background:#363b45;border-radius:5px}
+  .pixel-leg.l{left:26px}.pixel-leg.r{right:26px}
+  .pixel-shoe{position:absolute;bottom:-2px;width:31px;height:10px;background:#222;border-radius:6px}
+  .pixel-shoe.l{left:18px}.pixel-shoe.r{right:18px}
+  .held-item{
+    position:absolute;left:50%;bottom:130px;transform:translateX(-50%);
+    font-size:47px;filter:drop-shadow(0 4px 2px rgba(0,0,0,.25));z-index:4;
+  }
+  .held-item.throwing{transition:none}
+  .item-card{
+    position:absolute;left:10px;right:10px;bottom:170px;
+    margin:auto;width:min(88%,390px);
+    background:#fffaf2;border:2px solid #b9aa93;border-radius:14px;padding:8px 10px;
+    font-weight:850;box-shadow:0 3px 0 rgba(0,0,0,.1)
+  }
+  .item-card strong{font-size:18px}
+  .gb-message{
+    min-height:46px;margin:9px 0 7px;padding:8px 10px;
+    border-radius:12px;background:#fffaf2;border:2px solid #c6b9a5;font-weight:900
+  }
+  .gb-help{font-size:12px;opacity:.7;margin-bottom:8px}
+  .gb-close{
+    width:100%;border:0;border-radius:12px;padding:13px;font-size:17px;font-weight:950;
+    background:#d94f3d;color:#fff;display:none
+  }
+  .gb-close.show{display:block}
+
 </style>
 </head>
 <body>
@@ -191,10 +289,52 @@
 
   <div class="controls">
     <button class="ctrl" id="hintBtn">Hint</button>
+    <button class="ctrl gobacks" id="goBacksBtn">Go-Backs</button>
     <button class="ctrl primary" id="newBtn">New Game</button>
   </div>
 
-  <div class="footer">v0.2 • Slide a grocery toward a neighbor to swap.</div>
+  <div class="footer">v0.4 • Checkout Match + Return Go-Backs</div>
+</div>
+
+
+<div class="gobacks-overlay" id="goBacksOverlay">
+  <div class="gb-wrap">
+    <div class="gb-head">
+      <div class="left"><div class="gb-sub">Throws Left</div><div class="gb-number" id="gbThrows">5</div></div>
+      <div><div class="gb-title">Return Go-Backs</div><div class="gb-sub">Sort the item into the right tote</div></div>
+      <div class="right"><div class="gb-sub">Bonus Moves</div><div class="gb-number" id="gbCorrect">0</div></div>
+    </div>
+
+    <div class="gb-scene" id="gbScene">
+      <div class="store-sign">Back Room • Free-Throw Line</div>
+
+      <div class="totes">
+        <button class="tote" data-bin="grocery">GROCERY</button>
+        <button class="tote" data-bin="grocery_claims">GROCERY<br>CLAIMS</button>
+        <button class="tote" data-bin="gm">GM</button>
+        <button class="tote" data-bin="gm_claims">GM<br>CLAIMS</button>
+      </div>
+
+      <div class="item-card" id="gbItemCard"></div>
+      <div class="held-item" id="gbHeldItem">📦</div>
+      <div class="free-throw-line"></div>
+
+      <div class="colleen" aria-label="8-bit Colleen avatar wearing a blue vest">
+        <div class="pixel-hair"></div>
+        <div class="pixel-head"></div>
+        <div class="pixel-body"></div>
+        <div class="pixel-shirt"></div>
+        <div class="pixel-leg l"></div>
+        <div class="pixel-leg r"></div>
+        <div class="pixel-shoe l"></div>
+        <div class="pixel-shoe r"></div>
+      </div>
+    </div>
+
+    <div class="gb-message" id="gbMessage">Tap the correct tote to shoot the item.</div>
+    <div class="gb-help">You get 5 throws. Each correct basket earns +1 move in Checkout Match. Good items go to Grocery or GM; defective, damaged, leaking, broken, or spoiled items go to the matching Claims tote.</div>
+    <button class="gb-close" id="gbClose">Back to Checkout</button>
+  </div>
 </div>
 
 <div class="overlay" id="overlay">
@@ -238,6 +378,7 @@
   let order = {};
   let scanned = {};
   let customerNumber = 1;
+  let goBacksUsed = false;
 
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   const idx = (r,c) => r * COLS + c;
@@ -460,6 +601,8 @@
     score = 0;
     moves = 25;
     customerNumber = 1;
+    goBacksUsed = false;
+    document.getElementById('goBacksBtn').disabled = false;
     selected = null;
     locked = false;
     makeBoardWithoutStartingMatches();
@@ -472,6 +615,8 @@
   function nextCustomer() {
     customerNumber++;
     moves += 10;
+    goBacksUsed = false;
+    document.getElementById('goBacksBtn').disabled = false;
     generateOrder();
     render();
     overlay.classList.remove('show');
@@ -617,6 +762,167 @@
     activePointerId = null;
     [...gridEl.children].forEach(el => el.classList.remove('dragging'));
   });
+
+
+  // --- RETURN GO-BACKS SIDE GAME ---
+  const goBacksOverlay = document.getElementById('goBacksOverlay');
+  const goBacksBtn = document.getElementById('goBacksBtn');
+  const gbThrowsEl = document.getElementById('gbThrows');
+  const gbCorrectEl = document.getElementById('gbCorrect');
+  const gbItemCard = document.getElementById('gbItemCard');
+  const gbHeldItem = document.getElementById('gbHeldItem');
+  const gbMessage = document.getElementById('gbMessage');
+  const gbClose = document.getElementById('gbClose');
+  const gbScene = document.getElementById('gbScene');
+  const gbTotes = [...document.querySelectorAll('.tote')];
+
+  // Four destinations:
+  // Grocery = good food items
+  // Grocery Claims = defective/spoiled/damaged food items
+  // GM = good general-merchandise items
+  // GM Claims = broken/defective general merchandise
+  const GO_BACK_ITEMS = [
+    {name:'Box of cereal', icon:'🥣', bin:'grocery', note:'Unopened and in good shape'},
+    {name:'Loaf of bread', icon:'🍞', bin:'grocery', note:'Fresh and undamaged'},
+    {name:'Milk', icon:'🥛', bin:'grocery', note:'Cold, sealed, and in date'},
+    {name:'Bag of apples', icon:'🍎', bin:'grocery', note:'Good condition'},
+    {name:'Crushed cereal box', icon:'🥣', bin:'grocery_claims', note:'Package badly crushed'},
+    {name:'Leaking milk', icon:'🥛', bin:'grocery_claims', note:'Container is leaking'},
+    {name:'Spoiled produce', icon:'🍌', bin:'grocery_claims', note:'Spoiled / unsellable'},
+    {name:'Torn bag of rice', icon:'🍚', bin:'grocery_claims', note:'Package is torn open'},
+
+    {name:'Toy', icon:'🧸', bin:'gm', note:'Complete and in good shape'},
+    {name:'T-shirt', icon:'👕', bin:'gm', note:'Clean and undamaged'},
+    {name:'Flashlight', icon:'🔦', bin:'gm', note:'Works correctly'},
+    {name:'Kitchen pan', icon:'🍳', bin:'gm', note:'New and undamaged'},
+    {name:'Broken toy', icon:'🧸', bin:'gm_claims', note:'Cracked and broken'},
+    {name:'Damaged lamp', icon:'💡', bin:'gm_claims', note:'Does not work'},
+    {name:'Cracked storage bin', icon:'🧺', bin:'gm_claims', note:'Plastic is cracked'},
+    {name:'Defective headphones', icon:'🎧', bin:'gm_claims', note:'One side does not work'}
+  ];
+
+  let gbThrows = 5;
+  let gbCorrect = 0;
+  let gbCurrentItem = null;
+  let gbBusy = false;
+
+  function pickGoBackItem() {
+    gbCurrentItem = GO_BACK_ITEMS[Math.floor(Math.random() * GO_BACK_ITEMS.length)];
+    gbHeldItem.textContent = gbCurrentItem.icon;
+    gbHeldItem.style.left = '50%';
+    gbHeldItem.style.top = '';
+    gbHeldItem.style.bottom = '130px';
+    gbHeldItem.style.transform = 'translateX(-50%) scale(1)';
+    gbHeldItem.style.opacity = '1';
+    gbItemCard.innerHTML = `<strong>${gbCurrentItem.icon} ${gbCurrentItem.name}</strong><br><span>${gbCurrentItem.note}</span>`;
+  }
+
+  function updateGoBackHUD() {
+    gbThrowsEl.textContent = gbThrows;
+    gbCorrectEl.textContent = gbCorrect;
+  }
+
+  function startGoBacks() {
+    if (goBacksUsed || locked) return;
+    goBacksUsed = true;
+    goBacksBtn.disabled = true;
+    gbThrows = 5;
+    gbCorrect = 0;
+    gbBusy = false;
+    gbClose.classList.remove('show');
+    gbMessage.textContent = 'Tap the correct tote to shoot the item.';
+    updateGoBackHUD();
+    pickGoBackItem();
+    goBacksOverlay.classList.add('show');
+  }
+
+  function animateThrowTo(tote, wasCorrect) {
+    return new Promise(resolve => {
+      const sceneRect = gbScene.getBoundingClientRect();
+      const toteRect = tote.getBoundingClientRect();
+      const itemRect = gbHeldItem.getBoundingClientRect();
+
+      const startX = itemRect.left - sceneRect.left;
+      const startY = itemRect.top - sceneRect.top;
+      const endX = toteRect.left - sceneRect.left + toteRect.width/2 - itemRect.width/2;
+      const endY = toteRect.top - sceneRect.top + toteRect.height/2 - itemRect.height/2;
+
+      const midX = (startX + endX) / 2;
+      const midY = Math.max(18, Math.min(startY, endY) - 120);
+
+      gbHeldItem.animate([
+        {transform:'translate(0,0) rotate(0deg) scale(1)', offset:0},
+        {transform:`translate(${midX-startX}px,${midY-startY}px) rotate(180deg) scale(1.08)`, offset:.52},
+        {transform:`translate(${endX-startX}px,${endY-startY}px) rotate(360deg) scale(.62)`, offset:1}
+      ], {
+        duration:650,
+        easing:'cubic-bezier(.25,.65,.38,1)',
+        fill:'forwards'
+      }).onfinish = () => {
+        tote.classList.add(wasCorrect ? 'correct' : 'wrong');
+        setTimeout(()=>tote.classList.remove('correct','wrong'),360);
+        resolve();
+      };
+    });
+  }
+
+  async function chooseGoBackBin(tote) {
+    if (gbBusy || gbThrows <= 0 || !gbCurrentItem) return;
+    gbBusy = true;
+
+    const chosen = tote.dataset.bin;
+    const correct = chosen === gbCurrentItem.bin;
+
+    // Every shot uses one of the five throws.
+    gbThrows--;
+
+    // Each correct basket earns +1 move for the MAIN matching game.
+    if (correct) {
+      gbCorrect++;
+    }
+
+    updateGoBackHUD();
+    await animateThrowTo(tote, correct);
+
+    if (correct) {
+      gbMessage.textContent = '✅ Correct! +1 move earned for Checkout Match.';
+    } else {
+      const rightName = {
+        grocery:'Grocery',
+        grocery_claims:'Grocery Claims',
+        gm:'GM',
+        gm_claims:'GM Claims'
+      }[gbCurrentItem.bin];
+      gbMessage.textContent = `❌ Wrong tote. That item belongs in ${rightName}.`;
+    }
+
+    await sleep(420);
+
+    if (gbThrows <= 0) {
+      gbCurrentItem = null;
+      gbHeldItem.style.opacity = '0';
+      gbItemCard.innerHTML = `<strong>Go-backs complete!</strong><br>${gbCorrect} correct out of 5.`;
+      gbClose.textContent = `Back to Checkout (+${gbCorrect} move${gbCorrect === 1 ? '' : 's'})`;
+      gbMessage.textContent = `Round finished — you earned +${gbCorrect} checkout move${gbCorrect === 1 ? '' : 's'}.`;
+      gbClose.classList.add('show');
+      gbBusy = false;
+      return;
+    }
+
+    pickGoBackItem();
+    gbBusy = false;
+  }
+
+  goBacksBtn.addEventListener('click', startGoBacks);
+  gbTotes.forEach(tote => tote.addEventListener('click', () => chooseGoBackBin(tote)));
+
+  gbClose.addEventListener('click', () => {
+    moves += gbCorrect;
+    render();
+    goBacksOverlay.classList.remove('show');
+    statusEl.textContent = `Go-backs returned: +${gbCorrect} checkout move${gbCorrect === 1 ? '' : 's'}!`;
+  });
+
 
   document.getElementById('newBtn').addEventListener('click', newGame);
   document.getElementById('hintBtn').addEventListener('click', showHint);
