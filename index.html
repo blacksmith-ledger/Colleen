@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+<title>Checkout Match v0.1</title>
+<style>
+  :root{
+    --bg:#f2eadf;
+    --panel:#fffaf2;
+    --ink:#2b2b2b;
+    --accent:#d94f3d;
+    --belt:#3b3b3b;
+    --tile:#ffffff;
+    --gap:5px;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{
+    margin:0;
+    min-height:100vh;
+    background:linear-gradient(#f6efe6,#e9dccb);
+    font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    color:var(--ink);
+    display:flex;
+    justify-content:center;
+  }
+  .game{
+    width:min(100%,520px);
+    padding:max(12px,env(safe-area-inset-top)) 12px max(16px,env(safe-area-inset-bottom));
+  }
+  h1{
+    margin:4px 0 8px;
+    text-align:center;
+    font-size:clamp(24px,6vw,34px);
+    letter-spacing:.5px;
+  }
+  .top{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:8px;
+    margin-bottom:8px;
+  }
+  .card{
+    background:var(--panel);
+    border:2px solid #cbbba5;
+    border-radius:14px;
+    padding:10px 12px;
+    box-shadow:0 3px 0 rgba(0,0,0,.08);
+  }
+  .label{font-size:12px;font-weight:800;text-transform:uppercase;opacity:.65;letter-spacing:.6px}
+  .big{font-size:24px;font-weight:900}
+  .order{
+    margin-bottom:8px;
+    background:#fffaf2;
+    border:2px solid #cbbba5;
+    border-radius:14px;
+    padding:10px 12px;
+  }
+  .order-row{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    margin-top:6px;
+    font-weight:800;
+  }
+  .goal{
+    background:#efe5d8;
+    border-radius:10px;
+    padding:6px 8px;
+  }
+  .goal.done{background:#cfe8c9;text-decoration:line-through}
+  .belt{
+    position:relative;
+    background:
+      repeating-linear-gradient(90deg,#313131 0 28px,#3b3b3b 28px 56px);
+    border:5px solid #777;
+    border-radius:18px;
+    padding:8px;
+    box-shadow:inset 0 0 0 2px #222;
+  }
+  .grid{
+    display:grid;
+    grid-template-columns:repeat(8,1fr);
+    gap:var(--gap);
+    touch-action:none;
+    user-select:none;
+  }
+  .tile{
+    aspect-ratio:1;
+    border:0;
+    border-radius:12px;
+    background:linear-gradient(#fff,#f2f2f2);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:clamp(24px,8.7vw,42px);
+    cursor:pointer;
+    box-shadow:0 2px 0 rgba(0,0,0,.22);
+    transition:transform .12s ease, opacity .15s ease, outline-color .12s ease;
+    outline:3px solid transparent;
+  }
+  .tile.selected{outline-color:#ffd74f;transform:scale(.92)}
+  .tile.matched{transform:scale(.25) rotate(10deg);opacity:.1}
+  .tile.hint{animation:pulse .7s infinite alternate}
+  @keyframes pulse{to{transform:scale(.86)}}
+  .status{
+    text-align:center;
+    min-height:28px;
+    margin:9px 0 2px;
+    font-weight:800;
+  }
+  .controls{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:8px;
+    margin-top:8px;
+  }
+  .ctrl{
+    border:0;
+    border-radius:12px;
+    padding:12px 10px;
+    font-size:16px;
+    font-weight:900;
+    background:#fffaf2;
+    box-shadow:0 3px 0 #c8b79f;
+  }
+  .ctrl.primary{background:#d94f3d;color:#fff;box-shadow:0 3px 0 #9f3125}
+  .footer{
+    text-align:center;
+    font-size:12px;
+    opacity:.65;
+    margin-top:8px;
+  }
+  .overlay{
+    position:fixed;
+    inset:0;
+    background:rgba(20,20,20,.66);
+    display:none;
+    align-items:center;
+    justify-content:center;
+    padding:20px;
+    z-index:10;
+  }
+  .overlay.show{display:flex}
+  .modal{
+    width:min(92vw,390px);
+    background:#fffaf2;
+    border-radius:20px;
+    padding:22px;
+    text-align:center;
+    box-shadow:0 15px 50px rgba(0,0,0,.35);
+  }
+  .modal h2{font-size:30px;margin:0 0 8px}
+  .modal button{
+    width:100%;
+    border:0;
+    border-radius:12px;
+    padding:13px;
+    font-weight:900;
+    font-size:17px;
+    background:#d94f3d;
+    color:#fff;
+  }
+</style>
+</head>
+<body>
+<div class="game">
+  <h1>🛒 Checkout Match</h1>
+
+  <div class="top">
+    <div class="card">
+      <div class="label">Score</div>
+      <div class="big" id="score">0</div>
+    </div>
+    <div class="card">
+      <div class="label">Moves</div>
+      <div class="big" id="moves">25</div>
+    </div>
+  </div>
+
+  <div class="order">
+    <div class="label">Customer Order</div>
+    <div class="order-row" id="orderRow"></div>
+  </div>
+
+  <div class="belt">
+    <div id="grid" class="grid" aria-label="grocery matching board"></div>
+  </div>
+
+  <div id="status" class="status">Drag one grocery onto an adjacent grocery.</div>
+
+  <div class="controls">
+    <button class="ctrl" id="hintBtn">Hint</button>
+    <button class="ctrl primary" id="newBtn">New Game</button>
+  </div>
+
+  <div class="footer">v0.1 • Match 3 or more groceries to scan them.</div>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <h2 id="modalTitle">Customer Complete!</h2>
+    <p id="modalText"></p>
+    <button id="continueBtn">Next Customer</button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const ROWS = 8, COLS = 8;
+  const ITEMS = [
+    {id:'apple', icon:'🍎', name:'Apples'},
+    {id:'milk', icon:'🥛', name:'Milk'},
+    {id:'bread', icon:'🍞', name:'Bread'},
+    {id:'cheese', icon:'🧀', name:'Cheese'},
+    {id:'carrot', icon:'🥕', name:'Carrots'},
+    {id:'egg', icon:'🥚', name:'Eggs'},
+    {id:'banana', icon:'🍌', name:'Bananas'},
+    {id:'can', icon:'🥫', name:'Cans'}
+  ];
+
+  const gridEl = document.getElementById('grid');
+  const scoreEl = document.getElementById('score');
+  const movesEl = document.getElementById('moves');
+  const statusEl = document.getElementById('status');
+  const orderRow = document.getElementById('orderRow');
+  const overlay = document.getElementById('overlay');
+  const modalTitle = document.getElementById('modalTitle');
+  const modalText = document.getElementById('modalText');
+  const continueBtn = document.getElementById('continueBtn');
+
+  let board = [];
+  let score = 0;
+  let moves = 25;
+  let selected = null;
+  let locked = false;
+  let startCell = null;
+  let order = {};
+  let scanned = {};
+  let customerNumber = 1;
+
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const idx = (r,c) => r * COLS + c;
+  const rc = i => [Math.floor(i / COLS), i % COLS];
+  const itemById = id => ITEMS.find(x => x.id === id);
+
+  function randomItem() {
+    return ITEMS[Math.floor(Math.random()*ITEMS.length)].id;
+  }
+
+  function makeBoardWithoutStartingMatches() {
+    board = new Array(ROWS*COLS);
+    for (let r=0;r<ROWS;r++) {
+      for (let c=0;c<COLS;c++) {
+        let choices = ITEMS.map(x=>x.id);
+        const left1 = c>=1 ? board[idx(r,c-1)] : null;
+        const left2 = c>=2 ? board[idx(r,c-2)] : null;
+        const up1 = r>=1 ? board[idx(r-1,c)] : null;
+        const up2 = r>=2 ? board[idx(r-2,c)] : null;
+        choices = choices.filter(id => !(id===left1 && id===left2) && !(id===up1 && id===up2));
+        board[idx(r,c)] = choices[Math.floor(Math.random()*choices.length)];
+      }
+    }
+    if (!hasPossibleMove()) makeBoardWithoutStartingMatches();
+  }
+
+  function generateOrder() {
+    order = {};
+    scanned = {};
+    const picks = [...ITEMS].sort(()=>Math.random()-.5).slice(0,3);
+    picks.forEach((item, i) => {
+      order[item.id] = 4 + Math.floor(Math.random()*4); // 4-7
+      scanned[item.id] = 0;
+    });
+    renderOrder();
+  }
+
+  function renderOrder() {
+    orderRow.innerHTML = '';
+    for (const [id, target] of Object.entries(order)) {
+      const it = itemById(id);
+      const got = scanned[id] || 0;
+      const div = document.createElement('div');
+      div.className = 'goal' + (got >= target ? ' done' : '');
+      div.textContent = `${it.icon} ${Math.min(got,target)}/${target}`;
+      orderRow.appendChild(div);
+    }
+  }
+
+  function render(matchedSet = new Set()) {
+    gridEl.innerHTML = '';
+    board.forEach((id, i) => {
+      const btn = document.createElement('button');
+      btn.className = 'tile';
+      if (selected === i) btn.classList.add('selected');
+      if (matchedSet.has(i)) btn.classList.add('matched');
+      btn.dataset.index = i;
+      btn.setAttribute('aria-label', itemById(id)?.name || 'grocery');
+      btn.textContent = id ? itemById(id).icon : '';
+      gridEl.appendChild(btn);
+    });
+    scoreEl.textContent = score;
+    movesEl.textContent = moves;
+    renderOrder();
+  }
+
+  function adjacent(a,b) {
+    const [ar,ac] = rc(a), [br,bc] = rc(b);
+    return Math.abs(ar-br)+Math.abs(ac-bc) === 1;
+  }
+
+  function swap(a,b) {
+    [board[a],board[b]] = [board[b],board[a]];
+  }
+
+  function findMatches() {
+    const matches = new Set();
+
+    for (let r=0;r<ROWS;r++) {
+      let runStart = 0;
+      for (let c=1;c<=COLS;c++) {
+        const same = c<COLS && board[idx(r,c)] && board[idx(r,c)] === board[idx(r,runStart)];
+        if (!same) {
+          const len = c-runStart;
+          if (board[idx(r,runStart)] && len>=3) {
+            for (let k=runStart;k<c;k++) matches.add(idx(r,k));
+          }
+          runStart = c;
+        }
+      }
+    }
+
+    for (let c=0;c<COLS;c++) {
+      let runStart = 0;
+      for (let r=1;r<=ROWS;r++) {
+        const same = r<ROWS && board[idx(r,c)] && board[idx(r,c)] === board[idx(runStart,c)];
+        if (!same) {
+          const len = r-runStart;
+          if (board[idx(runStart,c)] && len>=3) {
+            for (let k=runStart;k<r;k++) matches.add(idx(k,c));
+          }
+          runStart = r;
+        }
+      }
+    }
+    return matches;
+  }
+
+  async function resolveMatches(initialMatches) {
+    let matches = initialMatches;
+    let chain = 1;
+
+    while (matches.size) {
+      const counts = {};
+      matches.forEach(i => {
+        const id = board[i];
+        counts[id] = (counts[id]||0)+1;
+      });
+
+      render(matches);
+      await sleep(180);
+
+      matches.forEach(i => board[i] = null);
+
+      for (const [id,count] of Object.entries(counts)) {
+        score += count * 10 * chain;
+        if (id in scanned) scanned[id] += count;
+      }
+
+      dropAndFill();
+      render();
+      await sleep(180);
+
+      matches = findMatches();
+      chain++;
+    }
+
+    if (isOrderComplete()) {
+      locked = false;
+      showCustomerComplete();
+      return;
+    }
+
+    if (moves <= 0) {
+      locked = false;
+      showGameOver();
+      return;
+    }
+
+    if (!hasPossibleMove()) {
+      statusEl.textContent = 'No moves — reshuffling groceries!';
+      await sleep(350);
+      makeBoardWithoutStartingMatches();
+      render();
+    }
+
+    locked = false;
+    statusEl.textContent = 'Drag one grocery onto an adjacent grocery.';
+  }
+
+  function dropAndFill() {
+    for (let c=0;c<COLS;c++) {
+      const vals = [];
+      for (let r=ROWS-1;r>=0;r--) {
+        const v = board[idx(r,c)];
+        if (v) vals.push(v);
+      }
+      let pos = 0;
+      for (let r=ROWS-1;r>=0;r--) {
+        board[idx(r,c)] = pos < vals.length ? vals[pos++] : randomItem();
+      }
+    }
+  }
+
+  async function tryMove(a,b) {
+    if (locked || a===b || !adjacent(a,b)) return;
+    locked = true;
+    selected = null;
+    swap(a,b);
+    render();
+
+    let matches = findMatches();
+    if (!matches.size) {
+      await sleep(140);
+      swap(a,b);
+      render();
+      statusEl.textContent = 'That swap did not make a match.';
+      await sleep(250);
+      locked = false;
+      return;
+    }
+
+    moves--;
+    render();
+    statusEl.textContent = 'Beep! Groceries scanned.';
+    await resolveMatches(matches);
+  }
+
+  function isOrderComplete() {
+    return Object.entries(order).every(([id,target]) => (scanned[id]||0) >= target);
+  }
+
+  function showCustomerComplete() {
+    modalTitle.textContent = '🧾 Customer Complete!';
+    modalText.textContent = `Customer ${customerNumber} checked out. Score: ${score}.`;
+    continueBtn.textContent = 'Next Customer';
+    continueBtn.dataset.mode = 'next';
+    overlay.classList.add('show');
+  }
+
+  function showGameOver() {
+    modalTitle.textContent = '⏰ Shift Over';
+    modalText.textContent = `You scored ${score} points and reached customer ${customerNumber}.`;
+    continueBtn.textContent = 'Play Again';
+    continueBtn.dataset.mode = 'restart';
+    overlay.classList.add('show');
+  }
+
+  function newGame() {
+    score = 0;
+    moves = 25;
+    customerNumber = 1;
+    selected = null;
+    locked = false;
+    makeBoardWithoutStartingMatches();
+    generateOrder();
+    render();
+    statusEl.textContent = 'Drag one grocery onto an adjacent grocery.';
+    overlay.classList.remove('show');
+  }
+
+  function nextCustomer() {
+    customerNumber++;
+    moves += 10;
+    generateOrder();
+    render();
+    overlay.classList.remove('show');
+    statusEl.textContent = `Customer ${customerNumber} is ready!`;
+  }
+
+  function hasPossibleMove() {
+    for (let r=0;r<ROWS;r++) {
+      for (let c=0;c<COLS;c++) {
+        const a = idx(r,c);
+        const candidates = [];
+        if (c+1<COLS) candidates.push(idx(r,c+1));
+        if (r+1<ROWS) candidates.push(idx(r+1,c));
+        for (const b of candidates) {
+          swap(a,b);
+          const ok = findMatches().size>0;
+          swap(a,b);
+          if (ok) return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  function findHint() {
+    for (let r=0;r<ROWS;r++) {
+      for (let c=0;c<COLS;c++) {
+        const a = idx(r,c);
+        const candidates = [];
+        if (c+1<COLS) candidates.push(idx(r,c+1));
+        if (r+1<ROWS) candidates.push(idx(r+1,c));
+        for (const b of candidates) {
+          swap(a,b);
+          const ok = findMatches().size>0;
+          swap(a,b);
+          if (ok) return [a,b];
+        }
+      }
+    }
+    return null;
+  }
+
+  function showHint() {
+    if (locked) return;
+    const hint = findHint();
+    if (!hint) return;
+    [...gridEl.children].forEach(el=>el.classList.remove('hint'));
+    hint.forEach(i => gridEl.children[i]?.classList.add('hint'));
+    statusEl.textContent = 'Try swapping the pulsing groceries.';
+    setTimeout(()=> {
+      [...gridEl.children].forEach(el=>el.classList.remove('hint'));
+    }, 1600);
+  }
+
+  // Tap-to-swap fallback
+  gridEl.addEventListener('click', e => {
+    const tile = e.target.closest('.tile');
+    if (!tile || locked) return;
+    const i = Number(tile.dataset.index);
+
+    if (selected === null) {
+      selected = i;
+      render();
+      return;
+    }
+    if (selected === i) {
+      selected = null;
+      render();
+      return;
+    }
+    if (adjacent(selected,i)) {
+      const a = selected;
+      selected = null;
+      tryMove(a,i);
+    } else {
+      selected = i;
+      render();
+    }
+  });
+
+  // Drag/swipe swap for touch and mouse
+  gridEl.addEventListener('pointerdown', e => {
+    const tile = e.target.closest('.tile');
+    if (!tile || locked) return;
+    startCell = Number(tile.dataset.index);
+    try { tile.setPointerCapture(e.pointerId); } catch {}
+  });
+
+  gridEl.addEventListener('pointerup', e => {
+    if (startCell === null || locked) return;
+    const rect = gridEl.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const cellW = rect.width / COLS;
+    const cellH = rect.height / ROWS;
+    const c = Math.floor(x / cellW);
+    const r = Math.floor(y / cellH);
+    const end = (r>=0 && r<ROWS && c>=0 && c<COLS) ? idx(r,c) : null;
+    const a = startCell;
+    startCell = null;
+
+    if (end !== null && adjacent(a,end)) {
+      selected = null;
+      tryMove(a,end);
+    }
+  });
+
+  document.getElementById('newBtn').addEventListener('click', newGame);
+  document.getElementById('hintBtn').addEventListener('click', showHint);
+  continueBtn.addEventListener('click', () => {
+    if (continueBtn.dataset.mode === 'restart') newGame();
+    else nextCustomer();
+  });
+
+  newGame();
+})();
+</script>
+</body>
+</html>
