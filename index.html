@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
-<title>Checkout Match v0.5.3</title>
+<title>Checkout Match v0.5.6</title>
 <style>
   :root{
     --bg:#f2eadf;
@@ -71,6 +71,9 @@
   .goal.done{background:#cfe8c9;text-decoration:line-through}
   .belt{
     position:relative;
+    width:100%;
+    max-width:100%;
+    overflow:hidden;
     background:
       repeating-linear-gradient(90deg,#313131 0 28px,#3b3b3b 28px 56px);
     border:5px solid #777;
@@ -80,20 +83,28 @@
   }
   .grid{
     display:grid;
-    grid-template-columns:repeat(8,1fr);
+    width:100%;
+    max-width:100%;
+    grid-template-columns:repeat(8,minmax(0,1fr));
     gap:var(--gap);
     touch-action:none;
     user-select:none;
+    overflow:hidden;
   }
   .tile{
+    width:100%;
+    min-width:0;
+    max-width:100%;
     aspect-ratio:1;
     border:0;
+    padding:0;
+    overflow:hidden;
     border-radius:12px;
     background:linear-gradient(#fff,#f2f2f2);
     display:flex;
     align-items:center;
     justify-content:center;
-    font-size:clamp(24px,8.7vw,42px);
+    font-size:clamp(20px,7vw,38px);
     cursor:pointer;
     box-shadow:0 2px 0 rgba(0,0,0,.22);
     transition:transform .12s ease, opacity .15s ease, outline-color .12s ease;
@@ -257,6 +268,10 @@
     width:100%;border:0;border-radius:12px;padding:13px;font-size:17px;font-weight:950;
     background:#d94f3d;color:#fff;display:none
   }
+  .gb-exit{
+    width:100%;border:0;border-radius:12px;padding:11px;font-size:16px;font-weight:900;
+    background:#fffaf2;color:#333;border:2px solid #bfae97;margin-bottom:8px
+  }
   .gb-close.show{display:block}
 
 
@@ -279,6 +294,34 @@
     display:none;position:absolute;height:3px;background:rgba(255,255,255,.78);
     border-radius:3px;transform-origin:left center;z-index:3;pointer-events:none;
     box-shadow:0 0 0 1px rgba(0,0,0,.12)
+  }
+
+
+  .tile .icon-wrap,
+  .goal .icon-wrap{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    line-height:1;
+  }
+  .tile .icon-wrap{
+    width:1em;
+    height:1em;
+    max-width:100%;
+    min-width:0;
+    flex:0 1 auto;
+  }
+  .brown-egg-icon{
+    display:inline-flex;
+    width:1em;
+    height:1em;
+    align-items:center;
+    justify-content:center;
+  }
+  .brown-egg-icon svg{
+    width:1em;
+    height:1em;
+    display:block;
   }
 
 </style>
@@ -315,7 +358,7 @@
     <button class="ctrl primary" id="newBtn">New Game</button>
   </div>
 
-  <div class="footer">v0.5.3 • Slingshot Go-Backs</div>
+  <div class="footer">v0.5.6 • Board fit fix</div>
 </div>
 
 
@@ -362,7 +405,8 @@
 
     <div class="gb-message" id="gbMessage">Pull the item back, aim toward a tote, and release.</div>
     <div class="gb-help">You get 5 throws. Pull the item back like a slingshot and release. Each correct basket earns +1 move in Checkout Match.</div>
-    <button class="gb-close" id="gbClose">Back to Checkout</button>
+    <button class="gb-exit" id="gbExit">Back to Checkout</button>
+    <button class="gb-close" id="gbClose">Collect Bonus & Return</button>
   </div>
 </div>
 
@@ -383,7 +427,7 @@
     {id:'bread', icon:'🍞', name:'Bread'},
     {id:'cheese', icon:'🧀', name:'Cheese'},
     {id:'carrot', icon:'🥕', name:'Carrots'},
-    {id:'egg', icon:'🥚', name:'Eggs'},
+    {id:'egg', icon:`<span class="brown-egg-icon" aria-hidden="true"><svg viewBox="0 0 64 64" width="1em" height="1em" xmlns="http://www.w3.org/2000/svg"><path d="M32 6C22 6 13 17 13 30c0 16 9 28 19 28s19-12 19-28C51 17 42 6 32 6z" fill="#9b6a43"/><path d="M32 10c-8 0-16 10-16 22 0 14 8 24 16 24s16-10 16-24C48 20 40 10 32 10z" fill="#a9774c"/><ellipse cx="25" cy="24" rx="8" ry="10" fill="rgba(255,255,255,.16)"/></svg></span>`, name:'Eggs'},
     {id:'banana', icon:'🍌', name:'Bananas'},
     {id:'can', icon:'🥫', name:'Cans'}
   ];
@@ -452,7 +496,7 @@
       const got = scanned[id] || 0;
       const div = document.createElement('div');
       div.className = 'goal' + (got >= target ? ' done' : '');
-      div.textContent = `${it.icon} ${Math.min(got,target)}/${target}`;
+      div.innerHTML = `<span class="icon-wrap">${it.icon}</span> ${Math.min(got,target)}/${target}`;
       orderRow.appendChild(div);
     }
   }
@@ -466,7 +510,7 @@
       if (matchedSet.has(i)) btn.classList.add('matched');
       btn.dataset.index = i;
       btn.setAttribute('aria-label', itemById(id)?.name || 'grocery');
-      btn.textContent = id ? itemById(id).icon : '';
+      btn.innerHTML = id ? `<span class="icon-wrap">${itemById(id).icon}</span>` : '';
       gridEl.appendChild(btn);
     });
     scoreEl.textContent = score;
@@ -802,6 +846,7 @@
   const gbHeldItem = document.getElementById('gbHeldItem');
   const gbMessage = document.getElementById('gbMessage');
   const gbClose = document.getElementById('gbClose');
+  const gbExit = document.getElementById('gbExit');
   const gbScene = document.getElementById('gbScene');
   const gbTotes = [...document.querySelectorAll('.tote')];
   const gbSlingLine1 = document.getElementById('gbSlingLine1');
@@ -841,6 +886,10 @@
   }
 
   function resetSlingVisuals() {
+    try {
+      gbHeldItem.getAnimations().forEach(anim => anim.cancel());
+    } catch {}
+
     gbHeldItem.style.left = '50%';
     gbHeldItem.style.top = '';
     gbHeldItem.style.bottom = '130px';
@@ -866,6 +915,7 @@
     gbCorrect = 0;
     gbBusy = false;
     gbClose.classList.remove('show');
+    gbExit.style.display = 'block';
     gbMessage.textContent = 'Touch the item, pull it back, aim, and release.';
     updateGoBackHUD();
     pickGoBackItem();
@@ -922,7 +972,10 @@
         {left:`${mx-ir.width/2}px`, top:`${my-ir.height/2}px`, bottom:'auto', transform:'rotate(180deg) scale(1.08)'},
         {left:`${ex-ir.width/2}px`, top:`${ey-ir.height/2}px`, bottom:'auto', transform:'rotate(360deg) scale(.65)'}
       ], {duration:620,easing:'cubic-bezier(.2,.65,.35,1)',fill:'forwards'});
-      anim.onfinish = resolve;
+      anim.onfinish = () => {
+        anim.cancel();
+        resolve();
+      };
     });
   }
 
@@ -951,12 +1004,14 @@
       gbClose.textContent = `Back to Checkout (+${gbCorrect})`;
       gbMessage.textContent = `Round finished — +${gbCorrect} checkout move${gbCorrect===1?'':'s'}.`;
       gbClose.classList.add('show');
+      gbExit.style.display = 'none';
       gbBusy = false;
       return;
     }
 
-    pickGoBackItem();
     gbBusy = false;
+    pickGoBackItem();
+    gbMessage.textContent = 'Next item ready — pull back and release.';
   }
 
   function beginSling(clientX, clientY) {
@@ -1055,6 +1110,18 @@
   });
 
   goBacksBtn.addEventListener('click', startGoBacks);
+
+  gbExit.addEventListener('click', () => {
+    moves += gbCorrect;
+    try { gbHeldItem.getAnimations().forEach(anim => anim.cancel()); } catch {}
+    slingDragging = false;
+    gbBusy = false;
+    goBacksOverlay.classList.remove('show');
+    render();
+    statusEl.textContent = gbCorrect
+      ? `Returned early: +${gbCorrect} checkout move${gbCorrect===1?'':'s'}.`
+      : 'Returned to Checkout Match.';
+  });
 
   gbClose.addEventListener('click', () => {
     moves += gbCorrect;
