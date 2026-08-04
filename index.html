@@ -1,0 +1,1077 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+<title>Checkout Match v0.5.3</title>
+<style>
+  :root{
+    --bg:#f2eadf;
+    --panel:#fffaf2;
+    --ink:#2b2b2b;
+    --accent:#d94f3d;
+    --belt:#3b3b3b;
+    --tile:#ffffff;
+    --gap:5px;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{
+    margin:0;
+    min-height:100vh;
+    background:linear-gradient(#f6efe6,#e9dccb);
+    font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    color:var(--ink);
+    display:flex;
+    justify-content:center;
+  }
+  .game{
+    width:min(100%,520px);
+    padding:max(12px,env(safe-area-inset-top)) 12px max(16px,env(safe-area-inset-bottom));
+  }
+  h1{
+    margin:4px 0 8px;
+    text-align:center;
+    font-size:clamp(24px,6vw,34px);
+    letter-spacing:.5px;
+  }
+  .top{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:8px;
+    margin-bottom:8px;
+  }
+  .card{
+    background:var(--panel);
+    border:2px solid #cbbba5;
+    border-radius:14px;
+    padding:10px 12px;
+    box-shadow:0 3px 0 rgba(0,0,0,.08);
+  }
+  .label{font-size:12px;font-weight:800;text-transform:uppercase;opacity:.65;letter-spacing:.6px}
+  .big{font-size:24px;font-weight:900}
+  .order{
+    margin-bottom:8px;
+    background:#fffaf2;
+    border:2px solid #cbbba5;
+    border-radius:14px;
+    padding:10px 12px;
+  }
+  .order-row{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    margin-top:6px;
+    font-weight:800;
+  }
+  .goal{
+    background:#efe5d8;
+    border-radius:10px;
+    padding:6px 8px;
+  }
+  .goal.done{background:#cfe8c9;text-decoration:line-through}
+  .belt{
+    position:relative;
+    background:
+      repeating-linear-gradient(90deg,#313131 0 28px,#3b3b3b 28px 56px);
+    border:5px solid #777;
+    border-radius:18px;
+    padding:8px;
+    box-shadow:inset 0 0 0 2px #222;
+  }
+  .grid{
+    display:grid;
+    grid-template-columns:repeat(8,1fr);
+    gap:var(--gap);
+    touch-action:none;
+    user-select:none;
+  }
+  .tile{
+    aspect-ratio:1;
+    border:0;
+    border-radius:12px;
+    background:linear-gradient(#fff,#f2f2f2);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:clamp(24px,8.7vw,42px);
+    cursor:pointer;
+    box-shadow:0 2px 0 rgba(0,0,0,.22);
+    transition:transform .12s ease, opacity .15s ease, outline-color .12s ease;
+    outline:3px solid transparent;
+  }
+  .tile.selected{outline-color:#ffd74f;transform:scale(.92)}.tile.dragging{transform:scale(.94);outline-color:#8ec5ff}
+  .tile.matched{transform:scale(.25) rotate(10deg);opacity:.1}
+  .tile.hint{animation:pulse .7s infinite alternate}
+  @keyframes pulse{to{transform:scale(.86)}}
+  .status{
+    text-align:center;
+    min-height:28px;
+    margin:9px 0 2px;
+    font-weight:800;
+  }
+  .controls{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:8px;
+    margin-top:8px;
+  }
+  .ctrl{
+    border:0;
+    border-radius:12px;
+    padding:12px 10px;
+    font-size:16px;
+    font-weight:900;
+    background:#fffaf2;
+    box-shadow:0 3px 0 #c8b79f;
+  }
+  .ctrl.primary{background:#d94f3d;color:#fff;box-shadow:0 3px 0 #9f3125}
+  .footer{
+    text-align:center;
+    font-size:12px;
+    opacity:.65;
+    margin-top:8px;
+  }
+  .overlay{
+    position:fixed;
+    inset:0;
+    background:rgba(20,20,20,.66);
+    display:none;
+    align-items:center;
+    justify-content:center;
+    padding:20px;
+    z-index:10;
+  }
+  .overlay.show{display:flex}
+  .modal{
+    width:min(92vw,390px);
+    background:#fffaf2;
+    border-radius:20px;
+    padding:22px;
+    text-align:center;
+    box-shadow:0 15px 50px rgba(0,0,0,.35);
+  }
+  .modal h2{font-size:30px;margin:0 0 8px}
+  .modal button{
+    width:100%;
+    border:0;
+    border-radius:12px;
+    padding:13px;
+    font-weight:900;
+    font-size:17px;
+    background:#d94f3d;
+    color:#fff;
+  }
+
+  .ctrl.gobacks{background:#3c78d8;color:#fff;box-shadow:0 3px 0 #27539a}
+  .ctrl:disabled{opacity:.45;box-shadow:none}
+  .gobacks-overlay{
+    position:fixed; inset:0; z-index:20; display:none;
+    background:linear-gradient(#dbe9f4 0 50%, #c9b28f 50% 100%);
+    color:#222; overflow:auto; padding:max(12px,env(safe-area-inset-top)) 12px max(18px,env(safe-area-inset-bottom));
+  }
+  .gobacks-overlay.show{display:block}
+  .gb-wrap{width:min(100%,560px);margin:0 auto;text-align:center}
+  .gb-head{
+    display:grid;grid-template-columns:1fr auto 1fr;align-items:center;
+    background:#fffaf2;border:2px solid #bcae99;border-radius:16px;padding:8px 10px;margin-bottom:8px
+  }
+  .gb-head .left{text-align:left}.gb-head .right{text-align:right}
+  .gb-title{font-weight:950;font-size:22px}
+  .gb-sub{font-size:12px;font-weight:800;opacity:.65;text-transform:uppercase}
+  .gb-number{font-size:23px;font-weight:950}
+  .gb-scene{
+    position:relative;height:min(65vh,590px);min-height:510px;overflow:hidden;
+    border:3px solid #8d826f;border-radius:20px;
+    background:
+      linear-gradient(#e8f4ff 0 51%, #ddd0b9 51% 100%);
+    box-shadow:inset 0 -80px 0 rgba(0,0,0,.03)
+  }
+  .store-sign{
+    position:absolute;top:14px;left:50%;transform:translateX(-50%);
+    font-size:13px;font-weight:950;letter-spacing:1px;text-transform:uppercase;
+    background:#fff;padding:5px 11px;border:2px solid #999;border-radius:7px
+  }
+  .totes{
+    position:absolute;top:78px;left:10px;right:10px;
+    display:grid;grid-template-columns:repeat(4,1fr);gap:7px
+  }
+  .tote{
+    min-height:112px;border:0;border-radius:8px 8px 18px 18px;
+    background:linear-gradient(#7893a8,#49687f);
+    color:white;font-weight:950;font-size:11px;padding:8px 3px 5px;
+    box-shadow:inset 0 7px 0 #263d4e, 0 4px 0 rgba(0,0,0,.18);
+    position:relative;
+  }
+  .tote::before{
+    content:"";position:absolute;left:7px;right:7px;top:-7px;height:10px;
+    border-radius:7px;background:#2e4658
+  }
+  .tote.correct{animation:toteGood .36s}
+  .tote.wrong{animation:toteBad .36s}
+  @keyframes toteGood{50%{transform:scale(1.08)}}
+  @keyframes toteBad{25%,75%{transform:translateX(-5px)}50%{transform:translateX(5px)}}
+  .free-throw-line{
+    position:absolute;left:15%;right:15%;bottom:142px;height:4px;background:#f7f4e9;border-radius:4px;
+    box-shadow:0 0 0 1px rgba(0,0,0,.15)
+  }
+  .colleen{
+    position:absolute;left:50%;bottom:19px;transform:translateX(-50%);
+    width:108px;height:142px;
+  }
+  .pixel-head{
+    position:absolute;left:31px;top:0;width:47px;height:47px;background:#efc7a2;border-radius:13px;
+    box-shadow:inset 0 -4px rgba(0,0,0,.07)
+  }
+  .pixel-hair{
+    position:absolute;left:26px;top:-3px;width:57px;height:27px;background:#5b4337;border-radius:16px 16px 5px 5px
+  }
+  .pixel-body{
+    position:absolute;left:18px;top:43px;width:73px;height:70px;background:#287bc1;border-radius:10px 10px 18px 18px;
+    box-shadow:inset 12px 0 rgba(255,255,255,.08),inset -12px 0 rgba(0,0,0,.07)
+  }
+  .pixel-shirt{
+    position:absolute;left:34px;top:47px;width:41px;height:62px;background:#eee7dc;border-radius:5px
+  }
+  .pixel-leg{position:absolute;top:106px;width:24px;height:34px;background:#363b45;border-radius:5px}
+  .pixel-leg.l{left:26px}.pixel-leg.r{right:26px}
+  .pixel-shoe{position:absolute;bottom:-2px;width:31px;height:10px;background:#222;border-radius:6px}
+  .pixel-shoe.l{left:18px}.pixel-shoe.r{right:18px}
+  .held-item{
+    position:absolute;left:50%;bottom:130px;transform:translateX(-50%);
+    font-size:47px;filter:drop-shadow(0 4px 2px rgba(0,0,0,.25));z-index:4;
+  }
+  .held-item.throwing{transition:none}
+  .item-card{
+    position:absolute;left:10px;right:10px;bottom:170px;
+    margin:auto;width:min(88%,390px);
+    background:#fffaf2;border:2px solid #b9aa93;border-radius:14px;padding:8px 10px;
+    font-weight:850;box-shadow:0 3px 0 rgba(0,0,0,.1)
+  }
+  .item-card strong{font-size:18px}
+  .gb-message{
+    min-height:46px;margin:9px 0 7px;padding:8px 10px;
+    border-radius:12px;background:#fffaf2;border:2px solid #c6b9a5;font-weight:900
+  }
+  .gb-help{font-size:12px;opacity:.7;margin-bottom:8px}
+  .gb-close{
+    width:100%;border:0;border-radius:12px;padding:13px;font-size:17px;font-weight:950;
+    background:#d94f3d;color:#fff;display:none
+  }
+  .gb-close.show{display:block}
+
+
+  .gb-scene{touch-action:none}
+  .held-item{touch-action:none;user-select:none;-webkit-user-select:none;z-index:6}
+  .simple-sling{
+    position:absolute;left:50%;bottom:112px;transform:translateX(-50%);
+    width:92px;height:62px;pointer-events:none;z-index:2
+  }
+  .sling-fork{
+    position:absolute;bottom:0;width:11px;height:54px;background:#805126;
+    border-radius:7px 7px 3px 3px
+  }
+  .sling-left{left:15px}.sling-right{right:15px}
+  .sling-line{
+    display:none;position:absolute;height:4px;background:#3c2718;
+    border-radius:4px;transform-origin:left center;z-index:3
+  }
+  .aim-ray{
+    display:none;position:absolute;height:3px;background:rgba(255,255,255,.78);
+    border-radius:3px;transform-origin:left center;z-index:3;pointer-events:none;
+    box-shadow:0 0 0 1px rgba(0,0,0,.12)
+  }
+
+</style>
+</head>
+<body>
+<div class="game">
+  <h1>🛒 Checkout Match</h1>
+
+  <div class="top">
+    <div class="card">
+      <div class="label">Score</div>
+      <div class="big" id="score">0</div>
+    </div>
+    <div class="card">
+      <div class="label">Moves</div>
+      <div class="big" id="moves">25</div>
+    </div>
+  </div>
+
+  <div class="order">
+    <div class="label">Customer Order</div>
+    <div class="order-row" id="orderRow"></div>
+  </div>
+
+  <div class="belt">
+    <div id="grid" class="grid" aria-label="grocery matching board"></div>
+  </div>
+
+  <div id="status" class="status">Slide a grocery left, right, up, or down to swap.</div>
+
+  <div class="controls">
+    <button class="ctrl" id="hintBtn">Hint</button>
+    <button class="ctrl gobacks" id="goBacksBtn">Go-Backs</button>
+    <button class="ctrl primary" id="newBtn">New Game</button>
+  </div>
+
+  <div class="footer">v0.5.3 • Slingshot Go-Backs</div>
+</div>
+
+
+<div class="gobacks-overlay" id="goBacksOverlay">
+  <div class="gb-wrap">
+    <div class="gb-head">
+      <div class="left"><div class="gb-sub">Throws Left</div><div class="gb-number" id="gbThrows">5</div></div>
+      <div><div class="gb-title">Return Go-Backs</div><div class="gb-sub">Sort the item into the right tote</div></div>
+      <div class="right"><div class="gb-sub">Bonus Moves</div><div class="gb-number" id="gbCorrect">0</div></div>
+    </div>
+
+    <div class="gb-scene" id="gbScene">
+      <div class="store-sign">Back Room • Free-Throw Line</div>
+
+      <div class="totes">
+        <button class="tote" data-bin="grocery">GROCERY</button>
+        <button class="tote" data-bin="grocery_claims">GROCERY<br>CLAIMS</button>
+        <button class="tote" data-bin="gm">GM</button>
+        <button class="tote" data-bin="gm_claims">GM<br>CLAIMS</button>
+      </div>
+
+      <div class="item-card" id="gbItemCard"></div>
+      <div class="simple-sling" id="gbSimpleSling">
+        <div class="sling-fork sling-left"></div>
+        <div class="sling-fork sling-right"></div>
+        <div class="sling-line" id="gbSlingLine1"></div>
+        <div class="sling-line" id="gbSlingLine2"></div>
+      </div>
+      <div class="held-item" id="gbHeldItem">📦</div>
+      <div class="aim-ray" id="gbAimRay"></div>
+      <div class="free-throw-line"></div>
+
+      <div class="colleen" aria-label="8-bit Colleen avatar wearing a blue vest">
+        <div class="pixel-hair"></div>
+        <div class="pixel-head"></div>
+        <div class="pixel-body"></div>
+        <div class="pixel-shirt"></div>
+        <div class="pixel-leg l"></div>
+        <div class="pixel-leg r"></div>
+        <div class="pixel-shoe l"></div>
+        <div class="pixel-shoe r"></div>
+      </div>
+    </div>
+
+    <div class="gb-message" id="gbMessage">Pull the item back, aim toward a tote, and release.</div>
+    <div class="gb-help">You get 5 throws. Pull the item back like a slingshot and release. Each correct basket earns +1 move in Checkout Match.</div>
+    <button class="gb-close" id="gbClose">Back to Checkout</button>
+  </div>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <h2 id="modalTitle">Customer Complete!</h2>
+    <p id="modalText"></p>
+    <button id="continueBtn">Next Customer</button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const ROWS = 8, COLS = 8;
+  const ITEMS = [
+    {id:'apple', icon:'🍎', name:'Apples'},
+    {id:'milk', icon:'🥛', name:'Milk'},
+    {id:'bread', icon:'🍞', name:'Bread'},
+    {id:'cheese', icon:'🧀', name:'Cheese'},
+    {id:'carrot', icon:'🥕', name:'Carrots'},
+    {id:'egg', icon:'🥚', name:'Eggs'},
+    {id:'banana', icon:'🍌', name:'Bananas'},
+    {id:'can', icon:'🥫', name:'Cans'}
+  ];
+
+  const gridEl = document.getElementById('grid');
+  const scoreEl = document.getElementById('score');
+  const movesEl = document.getElementById('moves');
+  const statusEl = document.getElementById('status');
+  const orderRow = document.getElementById('orderRow');
+  const overlay = document.getElementById('overlay');
+  const modalTitle = document.getElementById('modalTitle');
+  const modalText = document.getElementById('modalText');
+  const continueBtn = document.getElementById('continueBtn');
+
+  let board = [];
+  let score = 0;
+  let moves = 25;
+  let selected = null;
+  let locked = false;
+  let startCell = null;
+  let order = {};
+  let scanned = {};
+  let customerNumber = 1;
+  let goBacksUsed = false;
+
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const idx = (r,c) => r * COLS + c;
+  const rc = i => [Math.floor(i / COLS), i % COLS];
+  const itemById = id => ITEMS.find(x => x.id === id);
+
+  function randomItem() {
+    return ITEMS[Math.floor(Math.random()*ITEMS.length)].id;
+  }
+
+  function makeBoardWithoutStartingMatches() {
+    board = new Array(ROWS*COLS);
+    for (let r=0;r<ROWS;r++) {
+      for (let c=0;c<COLS;c++) {
+        let choices = ITEMS.map(x=>x.id);
+        const left1 = c>=1 ? board[idx(r,c-1)] : null;
+        const left2 = c>=2 ? board[idx(r,c-2)] : null;
+        const up1 = r>=1 ? board[idx(r-1,c)] : null;
+        const up2 = r>=2 ? board[idx(r-2,c)] : null;
+        choices = choices.filter(id => !(id===left1 && id===left2) && !(id===up1 && id===up2));
+        board[idx(r,c)] = choices[Math.floor(Math.random()*choices.length)];
+      }
+    }
+    if (!hasPossibleMove()) makeBoardWithoutStartingMatches();
+  }
+
+  function generateOrder() {
+    order = {};
+    scanned = {};
+    const picks = [...ITEMS].sort(()=>Math.random()-.5).slice(0,3);
+    picks.forEach((item, i) => {
+      order[item.id] = 4 + Math.floor(Math.random()*4); // 4-7
+      scanned[item.id] = 0;
+    });
+    renderOrder();
+  }
+
+  function renderOrder() {
+    orderRow.innerHTML = '';
+    for (const [id, target] of Object.entries(order)) {
+      const it = itemById(id);
+      const got = scanned[id] || 0;
+      const div = document.createElement('div');
+      div.className = 'goal' + (got >= target ? ' done' : '');
+      div.textContent = `${it.icon} ${Math.min(got,target)}/${target}`;
+      orderRow.appendChild(div);
+    }
+  }
+
+  function render(matchedSet = new Set()) {
+    gridEl.innerHTML = '';
+    board.forEach((id, i) => {
+      const btn = document.createElement('button');
+      btn.className = 'tile';
+      if (selected === i) btn.classList.add('selected');
+      if (matchedSet.has(i)) btn.classList.add('matched');
+      btn.dataset.index = i;
+      btn.setAttribute('aria-label', itemById(id)?.name || 'grocery');
+      btn.textContent = id ? itemById(id).icon : '';
+      gridEl.appendChild(btn);
+    });
+    scoreEl.textContent = score;
+    movesEl.textContent = moves;
+    renderOrder();
+  }
+
+  function adjacent(a,b) {
+    const [ar,ac] = rc(a), [br,bc] = rc(b);
+    return Math.abs(ar-br)+Math.abs(ac-bc) === 1;
+  }
+
+  function swap(a,b) {
+    [board[a],board[b]] = [board[b],board[a]];
+  }
+
+  function findMatches() {
+    const matches = new Set();
+
+    for (let r=0;r<ROWS;r++) {
+      let runStart = 0;
+      for (let c=1;c<=COLS;c++) {
+        const same = c<COLS && board[idx(r,c)] && board[idx(r,c)] === board[idx(r,runStart)];
+        if (!same) {
+          const len = c-runStart;
+          if (board[idx(r,runStart)] && len>=3) {
+            for (let k=runStart;k<c;k++) matches.add(idx(r,k));
+          }
+          runStart = c;
+        }
+      }
+    }
+
+    for (let c=0;c<COLS;c++) {
+      let runStart = 0;
+      for (let r=1;r<=ROWS;r++) {
+        const same = r<ROWS && board[idx(r,c)] && board[idx(r,c)] === board[idx(runStart,c)];
+        if (!same) {
+          const len = r-runStart;
+          if (board[idx(runStart,c)] && len>=3) {
+            for (let k=runStart;k<r;k++) matches.add(idx(k,c));
+          }
+          runStart = r;
+        }
+      }
+    }
+    return matches;
+  }
+
+  async function resolveMatches(initialMatches) {
+    let matches = initialMatches;
+    let chain = 1;
+
+    while (matches.size) {
+      const counts = {};
+      matches.forEach(i => {
+        const id = board[i];
+        counts[id] = (counts[id]||0)+1;
+      });
+
+      render(matches);
+      await sleep(180);
+
+      matches.forEach(i => board[i] = null);
+
+      for (const [id,count] of Object.entries(counts)) {
+        score += count * 10 * chain;
+        if (id in scanned) scanned[id] += count;
+      }
+
+      dropAndFill();
+      render();
+      await sleep(180);
+
+      matches = findMatches();
+      chain++;
+    }
+
+    if (isOrderComplete()) {
+      locked = false;
+      showCustomerComplete();
+      return;
+    }
+
+    if (moves <= 0) {
+      locked = false;
+      showGameOver();
+      return;
+    }
+
+    if (!hasPossibleMove()) {
+      statusEl.textContent = 'No moves — reshuffling groceries!';
+      await sleep(350);
+      makeBoardWithoutStartingMatches();
+      render();
+    }
+
+    locked = false;
+    statusEl.textContent = 'Slide a grocery left, right, up, or down to swap.';
+  }
+
+  function dropAndFill() {
+    for (let c=0;c<COLS;c++) {
+      const vals = [];
+      for (let r=ROWS-1;r>=0;r--) {
+        const v = board[idx(r,c)];
+        if (v) vals.push(v);
+      }
+      let pos = 0;
+      for (let r=ROWS-1;r>=0;r--) {
+        board[idx(r,c)] = pos < vals.length ? vals[pos++] : randomItem();
+      }
+    }
+  }
+
+  async function tryMove(a,b) {
+    if (locked || a===b || !adjacent(a,b)) return;
+    locked = true;
+    selected = null;
+    swap(a,b);
+    render();
+
+    let matches = findMatches();
+    if (!matches.size) {
+      await sleep(140);
+      swap(a,b);
+      render();
+      statusEl.textContent = 'That swap did not make a match.';
+      await sleep(250);
+      locked = false;
+      return;
+    }
+
+    moves--;
+    render();
+    statusEl.textContent = 'Beep! Groceries scanned.';
+    await resolveMatches(matches);
+  }
+
+  function isOrderComplete() {
+    return Object.entries(order).every(([id,target]) => (scanned[id]||0) >= target);
+  }
+
+  function showCustomerComplete() {
+    modalTitle.textContent = '🧾 Customer Complete!';
+    modalText.textContent = `Customer ${customerNumber} checked out. Score: ${score}.`;
+    continueBtn.textContent = 'Next Customer';
+    continueBtn.dataset.mode = 'next';
+    overlay.classList.add('show');
+  }
+
+  function showGameOver() {
+    modalTitle.textContent = '⏰ Shift Over';
+    modalText.textContent = `You scored ${score} points and reached customer ${customerNumber}.`;
+    continueBtn.textContent = 'Play Again';
+    continueBtn.dataset.mode = 'restart';
+    overlay.classList.add('show');
+  }
+
+  function newGame() {
+    score = 0;
+    moves = 25;
+    customerNumber = 1;
+    goBacksUsed = false;
+    document.getElementById('goBacksBtn').disabled = false;
+    selected = null;
+    locked = false;
+    makeBoardWithoutStartingMatches();
+    generateOrder();
+    render();
+    statusEl.textContent = 'Slide a grocery left, right, up, or down to swap.';
+    overlay.classList.remove('show');
+  }
+
+  function nextCustomer() {
+    customerNumber++;
+    moves += 10;
+    goBacksUsed = false;
+    document.getElementById('goBacksBtn').disabled = false;
+    generateOrder();
+    render();
+    overlay.classList.remove('show');
+    statusEl.textContent = `Customer ${customerNumber} is ready!`;
+  }
+
+  function hasPossibleMove() {
+    for (let r=0;r<ROWS;r++) {
+      for (let c=0;c<COLS;c++) {
+        const a = idx(r,c);
+        const candidates = [];
+        if (c+1<COLS) candidates.push(idx(r,c+1));
+        if (r+1<ROWS) candidates.push(idx(r+1,c));
+        for (const b of candidates) {
+          swap(a,b);
+          const ok = findMatches().size>0;
+          swap(a,b);
+          if (ok) return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  function findHint() {
+    for (let r=0;r<ROWS;r++) {
+      for (let c=0;c<COLS;c++) {
+        const a = idx(r,c);
+        const candidates = [];
+        if (c+1<COLS) candidates.push(idx(r,c+1));
+        if (r+1<ROWS) candidates.push(idx(r+1,c));
+        for (const b of candidates) {
+          swap(a,b);
+          const ok = findMatches().size>0;
+          swap(a,b);
+          if (ok) return [a,b];
+        }
+      }
+    }
+    return null;
+  }
+
+  function showHint() {
+    if (locked) return;
+    const hint = findHint();
+    if (!hint) return;
+    [...gridEl.children].forEach(el=>el.classList.remove('hint'));
+    hint.forEach(i => gridEl.children[i]?.classList.add('hint'));
+    statusEl.textContent = 'Try swapping the pulsing groceries.';
+    setTimeout(()=> {
+      [...gridEl.children].forEach(el=>el.classList.remove('hint'));
+    }, 1600);
+  }
+
+  // Tap-to-swap fallback
+  gridEl.addEventListener('click', e => {
+    const tile = e.target.closest('.tile');
+    if (!tile || locked) return;
+    const i = Number(tile.dataset.index);
+
+    if (selected === null) {
+      selected = i;
+      render();
+      return;
+    }
+    if (selected === i) {
+      selected = null;
+      render();
+      return;
+    }
+    if (adjacent(selected,i)) {
+      const a = selected;
+      selected = null;
+      tryMove(a,i);
+    } else {
+      selected = i;
+      render();
+    }
+  });
+
+  // Direction-based slide control:
+  // Start on a grocery, then slide a short distance in one direction.
+  // You do NOT need to land exactly on the neighboring square.
+  let swipeStartX = 0;
+  let swipeStartY = 0;
+  let activePointerId = null;
+
+  function neighborInDirection(cell, dx, dy) {
+    const [r,c] = rc(cell);
+
+    // Use whichever axis the finger moved farther on.
+    if (Math.abs(dx) > Math.abs(dy)) {
+      if (dx > 0 && c < COLS - 1) return idx(r, c + 1);
+      if (dx < 0 && c > 0) return idx(r, c - 1);
+    } else {
+      if (dy > 0 && r < ROWS - 1) return idx(r + 1, c);
+      if (dy < 0 && r > 0) return idx(r - 1, c);
+    }
+    return null;
+  }
+
+  gridEl.addEventListener('pointerdown', e => {
+    const tile = e.target.closest('.tile');
+    if (!tile || locked) return;
+
+    startCell = Number(tile.dataset.index);
+    swipeStartX = e.clientX;
+    swipeStartY = e.clientY;
+    activePointerId = e.pointerId;
+
+    tile.classList.add('dragging');
+    try { tile.setPointerCapture(e.pointerId); } catch {}
+  });
+
+  gridEl.addEventListener('pointerup', e => {
+    if (startCell === null || locked) return;
+    if (activePointerId !== null && e.pointerId !== activePointerId) return;
+
+    const dx = e.clientX - swipeStartX;
+    const dy = e.clientY - swipeStartY;
+    const distance = Math.hypot(dx, dy);
+    const a = startCell;
+
+    startCell = null;
+    activePointerId = null;
+    [...gridEl.children].forEach(el => el.classList.remove('dragging'));
+
+    // A short deliberate slide is enough. This is much more forgiving
+    // than requiring the finger to reach the center of the next tile.
+    const SWIPE_THRESHOLD = 16;
+
+    if (distance >= SWIPE_THRESHOLD) {
+      const b = neighborInDirection(a, dx, dy);
+      if (b !== null) {
+        selected = null;
+        tryMove(a, b);
+      }
+    }
+  });
+
+  gridEl.addEventListener('pointercancel', () => {
+    startCell = null;
+    activePointerId = null;
+    [...gridEl.children].forEach(el => el.classList.remove('dragging'));
+  });
+
+
+  // --- RETURN GO-BACKS SIDE GAME ---
+  const goBacksOverlay = document.getElementById('goBacksOverlay');
+  const goBacksBtn = document.getElementById('goBacksBtn');
+  const gbThrowsEl = document.getElementById('gbThrows');
+  const gbCorrectEl = document.getElementById('gbCorrect');
+  const gbItemCard = document.getElementById('gbItemCard');
+  const gbHeldItem = document.getElementById('gbHeldItem');
+  const gbMessage = document.getElementById('gbMessage');
+  const gbClose = document.getElementById('gbClose');
+  const gbScene = document.getElementById('gbScene');
+  const gbTotes = [...document.querySelectorAll('.tote')];
+  const gbSlingLine1 = document.getElementById('gbSlingLine1');
+  const gbSlingLine2 = document.getElementById('gbSlingLine2');
+  const gbAimRay = document.getElementById('gbAimRay');
+
+  const GO_BACK_ITEMS = [
+    {name:'Box of cereal', icon:'🥣', bin:'grocery', note:'Unopened and in good shape'},
+    {name:'Loaf of bread', icon:'🍞', bin:'grocery', note:'Fresh and undamaged'},
+    {name:'Milk', icon:'🥛', bin:'grocery', note:'Cold, sealed, and in date'},
+    {name:'Bag of apples', icon:'🍎', bin:'grocery', note:'Good condition'},
+    {name:'Crushed cereal box', icon:'🥣', bin:'grocery_claims', note:'Package badly crushed'},
+    {name:'Leaking milk', icon:'🥛', bin:'grocery_claims', note:'Container is leaking'},
+    {name:'Spoiled produce', icon:'🍌', bin:'grocery_claims', note:'Spoiled / unsellable'},
+    {name:'Torn bag of rice', icon:'🍚', bin:'grocery_claims', note:'Package is torn open'},
+    {name:'Toy', icon:'🧸', bin:'gm', note:'Complete and in good shape'},
+    {name:'T-shirt', icon:'👕', bin:'gm', note:'Clean and undamaged'},
+    {name:'Flashlight', icon:'🔦', bin:'gm', note:'Works correctly'},
+    {name:'Kitchen pan', icon:'🍳', bin:'gm', note:'New and undamaged'},
+    {name:'Broken toy', icon:'🧸', bin:'gm_claims', note:'Cracked and broken'},
+    {name:'Damaged lamp', icon:'💡', bin:'gm_claims', note:'Does not work'},
+    {name:'Cracked storage bin', icon:'🧺', bin:'gm_claims', note:'Plastic is cracked'},
+    {name:'Defective headphones', icon:'🎧', bin:'gm_claims', note:'One side does not work'}
+  ];
+
+  let gbThrows = 5;
+  let gbCorrect = 0;
+  let gbCurrentItem = null;
+  let gbBusy = false;
+  let slingDragging = false;
+  let slingStartX = 0, slingStartY = 0;
+  let slingDx = 0, slingDy = 0;
+
+  function updateGoBackHUD() {
+    gbThrowsEl.textContent = gbThrows;
+    gbCorrectEl.textContent = gbCorrect;
+  }
+
+  function resetSlingVisuals() {
+    gbHeldItem.style.left = '50%';
+    gbHeldItem.style.top = '';
+    gbHeldItem.style.bottom = '130px';
+    gbHeldItem.style.transform = 'translateX(-50%)';
+    gbHeldItem.style.opacity = '1';
+    gbSlingLine1.style.display = 'none';
+    gbSlingLine2.style.display = 'none';
+    gbAimRay.style.display = 'none';
+  }
+
+  function pickGoBackItem() {
+    gbCurrentItem = GO_BACK_ITEMS[Math.floor(Math.random() * GO_BACK_ITEMS.length)];
+    gbHeldItem.textContent = gbCurrentItem.icon;
+    gbItemCard.innerHTML = `<strong>${gbCurrentItem.icon} ${gbCurrentItem.name}</strong><br><span>${gbCurrentItem.note}</span>`;
+    resetSlingVisuals();
+  }
+
+  function startGoBacks() {
+    if (goBacksUsed || locked) return;
+    goBacksUsed = true;
+    goBacksBtn.disabled = true;
+    gbThrows = 5;
+    gbCorrect = 0;
+    gbBusy = false;
+    gbClose.classList.remove('show');
+    gbMessage.textContent = 'Touch the item, pull it back, aim, and release.';
+    updateGoBackHUD();
+    pickGoBackItem();
+    goBacksOverlay.classList.add('show');
+  }
+
+  function lineBetween(el, x1, y1, x2, y2) {
+    const dx = x2 - x1, dy = y2 - y1;
+    const len = Math.hypot(dx, dy);
+    el.style.display = 'block';
+    el.style.left = `${x1}px`;
+    el.style.top = `${y1}px`;
+    el.style.width = `${len}px`;
+    el.style.transform = `rotate(${Math.atan2(dy,dx)}rad)`;
+  }
+
+  function itemCenterInScene() {
+    const sr = gbScene.getBoundingClientRect();
+    const ir = gbHeldItem.getBoundingClientRect();
+    return {
+      x: ir.left - sr.left + ir.width/2,
+      y: ir.top - sr.top + ir.height/2,
+      sr
+    };
+  }
+
+  function toteForAim(projectedX) {
+    const sr = gbScene.getBoundingClientRect();
+    let best = gbTotes[0], bestD = Infinity;
+    gbTotes.forEach(tote => {
+      const r = tote.getBoundingClientRect();
+      const cx = r.left - sr.left + r.width/2;
+      const d = Math.abs(projectedX - cx);
+      if (d < bestD) { bestD = d; best = tote; }
+    });
+    return best;
+  }
+
+  function animateToTote(tote) {
+    return new Promise(resolve => {
+      const sr = gbScene.getBoundingClientRect();
+      const ir = gbHeldItem.getBoundingClientRect();
+      const tr = tote.getBoundingClientRect();
+
+      const sx = ir.left - sr.left + ir.width/2;
+      const sy = ir.top - sr.top + ir.height/2;
+      const ex = tr.left - sr.left + tr.width/2;
+      const ey = tr.top - sr.top + tr.height/2;
+      const mx = (sx + ex)/2;
+      const my = Math.max(25, Math.min(sy,ey)-115);
+
+      const anim = gbHeldItem.animate([
+        {left:`${sx-ir.width/2}px`, top:`${sy-ir.height/2}px`, bottom:'auto', transform:'rotate(0deg) scale(1)'},
+        {left:`${mx-ir.width/2}px`, top:`${my-ir.height/2}px`, bottom:'auto', transform:'rotate(180deg) scale(1.08)'},
+        {left:`${ex-ir.width/2}px`, top:`${ey-ir.height/2}px`, bottom:'auto', transform:'rotate(360deg) scale(.65)'}
+      ], {duration:620,easing:'cubic-bezier(.2,.65,.35,1)',fill:'forwards'});
+      anim.onfinish = resolve;
+    });
+  }
+
+  async function scoreThrow(tote) {
+    const correct = tote.dataset.bin === gbCurrentItem.bin;
+    gbThrows--;
+    if (correct) gbCorrect++;
+    updateGoBackHUD();
+
+    tote.classList.add(correct ? 'correct' : 'wrong');
+    setTimeout(()=>tote.classList.remove('correct','wrong'),350);
+
+    if (correct) {
+      gbMessage.textContent = '✅ Correct! +1 Checkout Match move.';
+    } else {
+      const names = {grocery:'Grocery',grocery_claims:'Grocery Claims',gm:'GM',gm_claims:'GM Claims'};
+      gbMessage.textContent = `❌ Wrong tote. Correct: ${names[gbCurrentItem.bin]}.`;
+    }
+
+    await sleep(420);
+
+    if (gbThrows <= 0) {
+      gbCurrentItem = null;
+      gbHeldItem.style.opacity = '0';
+      gbItemCard.innerHTML = `<strong>Go-backs complete!</strong><br>${gbCorrect} correct out of 5.`;
+      gbClose.textContent = `Back to Checkout (+${gbCorrect})`;
+      gbMessage.textContent = `Round finished — +${gbCorrect} checkout move${gbCorrect===1?'':'s'}.`;
+      gbClose.classList.add('show');
+      gbBusy = false;
+      return;
+    }
+
+    pickGoBackItem();
+    gbBusy = false;
+  }
+
+  function beginSling(clientX, clientY) {
+    if (gbBusy || gbThrows <= 0 || !gbCurrentItem) return;
+    gbBusy = true;
+    slingDragging = true;
+    slingStartX = clientX;
+    slingStartY = clientY;
+    slingDx = 0;
+    slingDy = 0;
+    gbMessage.textContent = 'Pull back farther for more aim.';
+  }
+
+  function moveSling(clientX, clientY) {
+    if (!slingDragging) return;
+    slingDx = Math.max(-100, Math.min(100, clientX - slingStartX));
+    slingDy = Math.max(-20, Math.min(135, clientY - slingStartY));
+
+    gbHeldItem.style.transform = `translateX(calc(-50% + ${slingDx}px)) translateY(${slingDy}px)`;
+
+    const c = itemCenterInScene();
+    const anchorX = c.sr.width/2;
+    const anchorY = c.sr.height - 150;
+
+    lineBetween(gbSlingLine1, anchorX-19, anchorY, c.x, c.y);
+    lineBetween(gbSlingLine2, anchorX+19, anchorY, c.x, c.y);
+
+    // Launch direction is the opposite direction from the pull.
+    const rayX = c.x - slingDx*2.6;
+    const rayY = Math.max(42, c.y - Math.max(170, slingDy*2.1));
+    lineBetween(gbAimRay, c.x, c.y, rayX, rayY);
+  }
+
+  async function releaseSling() {
+    if (!slingDragging) return;
+    slingDragging = false;
+
+    if (Math.hypot(slingDx,slingDy) < 14) {
+      resetSlingVisuals();
+      gbBusy = false;
+      gbMessage.textContent = 'Pull the item back, then release.';
+      return;
+    }
+
+    const c = itemCenterInScene();
+    const projectedX = c.x - slingDx*2.6;
+    const tote = toteForAim(projectedX);
+
+    gbSlingLine1.style.display = 'none';
+    gbSlingLine2.style.display = 'none';
+    gbAimRay.style.display = 'none';
+
+    await animateToTote(tote);
+    await scoreThrow(tote);
+  }
+
+  // iPhone/Safari touch events
+  gbHeldItem.addEventListener('touchstart', e => {
+    if (!e.touches.length) return;
+    e.preventDefault();
+    const t = e.touches[0];
+    beginSling(t.clientX,t.clientY);
+  }, {passive:false});
+
+  gbScene.addEventListener('touchmove', e => {
+    if (!slingDragging || !e.touches.length) return;
+    e.preventDefault();
+    const t = e.touches[0];
+    moveSling(t.clientX,t.clientY);
+  }, {passive:false});
+
+  gbScene.addEventListener('touchend', e => {
+    if (!slingDragging) return;
+    e.preventDefault();
+    releaseSling();
+  }, {passive:false});
+
+  gbScene.addEventListener('touchcancel', e => {
+    if (!slingDragging) return;
+    e.preventDefault();
+    slingDragging=false;
+    resetSlingVisuals();
+    gbBusy=false;
+  }, {passive:false});
+
+  // Mouse/desktop fallback
+  gbHeldItem.addEventListener('mousedown', e => {
+    e.preventDefault();
+    beginSling(e.clientX,e.clientY);
+  });
+  window.addEventListener('mousemove', e => {
+    if (slingDragging) moveSling(e.clientX,e.clientY);
+  });
+  window.addEventListener('mouseup', () => {
+    if (slingDragging) releaseSling();
+  });
+
+  goBacksBtn.addEventListener('click', startGoBacks);
+
+  gbClose.addEventListener('click', () => {
+    moves += gbCorrect;
+    render();
+    goBacksOverlay.classList.remove('show');
+    statusEl.textContent = `Go-backs returned: +${gbCorrect} checkout move${gbCorrect===1?'':'s'}!`;
+  });
+
+  document.getElementById('newBtn').addEventListener('click', newGame);
+  document.getElementById('hintBtn').addEventListener('click', showHint);
+  continueBtn.addEventListener('click', () => {
+    if (continueBtn.dataset.mode === 'restart') newGame();
+    else nextCustomer();
+  });
+
+  newGame();
+})();
+</script>
+</body>
+</html>
