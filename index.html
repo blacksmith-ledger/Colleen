@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
-<title>Checkout Match v0.5.1</title>
+<title>Checkout Match v0.5.2</title>
 <style>
   :root{
     --bg:#f2eadf;
@@ -180,7 +180,7 @@
   .gb-sub{font-size:12px;font-weight:800;opacity:.65;text-transform:uppercase}
   .gb-number{font-size:23px;font-weight:950}
   .gb-scene{
-    position:relative;height:min(65vh,590px);min-height:510px;overflow:hidden;
+    position:relative;height:min(65vh,590px);min-height:510px;overflow:hidden;touch-action:none;
     border:3px solid #8d826f;border-radius:20px;
     background:
       linear-gradient(#e8f4ff 0 51%, #ddd0b9 51% 100%);
@@ -238,9 +238,19 @@
   .pixel-shoe.l{left:18px}.pixel-shoe.r{right:18px}
   .held-item{
     position:absolute;left:50%;bottom:130px;transform:translateX(-50%);
-    font-size:47px;filter:drop-shadow(0 4px 2px rgba(0,0,0,.25));z-index:4;
+    font-size:47px;filter:drop-shadow(0 4px 2px rgba(0,0,0,.25));z-index:6;touch-action:none;user-select:none;-webkit-user-select:none;cursor:grab;
   }
   .held-item.throwing{transition:none}
+
+  .held-item::after{
+    content:"";position:absolute;left:50%;top:50%;width:76px;height:76px;
+    transform:translate(-50%,-50%);border:2px dashed rgba(255,255,255,.75);
+    border-radius:50%;pointer-events:none;animation:grabPulse 1s infinite alternate
+  }
+  .held-item.drag-active{cursor:grabbing}
+  .held-item.drag-active::after{opacity:.25}
+  @keyframes grabPulse{to{transform:translate(-50%,-50%) scale(1.08);opacity:.45}}
+
   .slingshot{
     position:absolute;left:50%;bottom:116px;transform:translateX(-50%);
     width:88px;height:56px;z-index:2;pointer-events:none
@@ -316,7 +326,7 @@
     <button class="ctrl primary" id="newBtn">New Game</button>
   </div>
 
-  <div class="footer">v0.5.1 • Slingshot Go-Backs button fix</div>
+  <div class="footer">v0.5.2 • Reliable touch slingshot</div>
 </div>
 
 
@@ -929,7 +939,7 @@
     gbDragging = false;
     gbClose.classList.remove('show');
     gbClose.textContent = 'Back to Checkout';
-    gbMessage.textContent = 'Pull the item back like a slingshot, aim, and release toward the correct tote.';
+    gbMessage.textContent = 'Touch the item, pull it back, then release toward the correct tote.';
     updateGoBackHUD();
     pickGoBackItem();
     goBacksOverlay.classList.add('show');
@@ -1048,10 +1058,15 @@
     gbBusy = false;
   }
 
-  gbHeldItem.addEventListener('pointerdown', e => {
+  let gbActivePointerId = null;
+
+  function beginSlingshotDrag(e) {
     if (gbBusy || gbThrows <= 0 || !gbCurrentItem) return;
+
+    e.preventDefault();
     gbDragging = true;
     gbBusy = true;
+    gbActivePointerId = e.pointerId;
 
     const anchor = getSlingAnchor();
     gbAnchorX = anchor.x;
@@ -1061,19 +1076,22 @@
     gbCurrentDx = 0;
     gbCurrentDy = 0;
 
-    gbHeldItem.setPointerCapture?.(e.pointerId);
+    gbHeldItem.classList.add('drag-active');
     gbMessage.textContent = 'Pull back, aim, and release.';
-  });
+  }
 
-  gbHeldItem.addEventListener('pointermove', e => {
+  function moveSlingshotDrag(e) {
     if (!gbDragging) return;
+    if (gbActivePointerId !== null && e.pointerId !== gbActivePointerId) return;
+
+    e.preventDefault();
 
     let dx = e.clientX - gbStartPointerX;
     let dy = e.clientY - gbStartPointerY;
 
-    // Only allow pulling backward/downward-ish from the sling.
-    dx = Math.max(-95, Math.min(95, dx));
-    dy = Math.max(-30, Math.min(130, dy));
+    // A forgiving pull area for phones.
+    dx = Math.max(-115, Math.min(115, dx));
+    dy = Math.max(-35, Math.min(155, dy));
 
     gbCurrentDx = dx;
     gbCurrentDy = dy;
@@ -1091,39 +1109,59 @@
     setBand(gbBandLeft, leftPostX, postY, itemCenterX, itemCenterY);
     setBand(gbBandRight, rightPostX, postY, itemCenterX, itemCenterY);
 
-    const vx = -dx * 0.14;
-    const vy = -dy * 0.14 - 3.8;
+    const vx = -dx * 0.145;
+    const vy = -dy * 0.145 - 3.4;
     drawAimGuide(vx, vy, itemCenterX, itemCenterY);
-  });
+  }
 
-  async function releaseSlingshot() {
+  async function endSlingshotDrag(e) {
     if (!gbDragging) return;
+    if (gbActivePointerId !== null && e && e.pointerId !== gbActivePointerId) return;
+
+    if (e) e.preventDefault();
+
     gbDragging = false;
+    gbActivePointerId = null;
+    gbHeldItem.classList.remove('drag-active');
 
     const launchDx = gbCurrentDx;
     const launchDy = gbCurrentDy;
     resetBandsAndGuide();
 
-    // Small pull = cancel shot
-    if (Math.hypot(launchDx, launchDy) < 16) {
+    // Tiny movement is treated as a cancelled shot.
+    if (Math.hypot(launchDx, launchDy) < 12) {
       resetHeldItemPosition();
       gbBusy = false;
+      gbMessage.textContent = 'Pull the item back farther, then release.';
       return;
     }
 
-    const vx = -launchDx * 0.14;
-    const vy = -launchDy * 0.14 - 3.8;
+    const vx = -launchDx * 0.145;
+    const vy = -launchDy * 0.145 - 3.4;
     const hitTote = await animateFlight(vx, vy);
     await finishThrow(hitTote);
   }
 
-  gbHeldItem.addEventListener('pointerup', releaseSlingshot);
-  gbHeldItem.addEventListener('pointercancel', () => {
+  function cancelSlingshotDrag(e) {
+    if (!gbDragging) return;
+    if (gbActivePointerId !== null && e && e.pointerId !== gbActivePointerId) return;
+    if (e) e.preventDefault();
+
     gbDragging = false;
+    gbActivePointerId = null;
+    gbHeldItem.classList.remove('drag-active');
     resetHeldItemPosition();
     resetBandsAndGuide();
-    if (gbBusy) gbBusy = false;
-  });
+    gbBusy = false;
+  }
+
+  gbHeldItem.addEventListener('pointerdown', beginSlingshotDrag, {passive:false});
+
+  // Track movement on the whole document so the drag keeps working even
+  // when the finger leaves the small item icon.
+  document.addEventListener('pointermove', moveSlingshotDrag, {passive:false});
+  document.addEventListener('pointerup', endSlingshotDrag, {passive:false});
+  document.addEventListener('pointercancel', cancelSlingshotDrag, {passive:false});
 
   goBacksBtn.addEventListener('click', startGoBacks);
 
