@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
-<title>Checkout Match v0.4</title>
+<title>Checkout Match v0.5</title>
 <style>
   :root{
     --bg:#f2eadf;
@@ -241,6 +241,29 @@
     font-size:47px;filter:drop-shadow(0 4px 2px rgba(0,0,0,.25));z-index:4;
   }
   .held-item.throwing{transition:none}
+  .slingshot{
+    position:absolute;left:50%;bottom:116px;transform:translateX(-50%);
+    width:88px;height:56px;z-index:2;pointer-events:none
+  }
+  .sling-post{
+    position:absolute;bottom:0;width:11px;height:50px;
+    background:linear-gradient(#986334,#6f441f);border-radius:7px 7px 3px 3px;
+    box-shadow:inset 0 -6px rgba(0,0,0,.16)
+  }
+  .sling-post.left{left:14px}
+  .sling-post.right{right:14px}
+  .sling-band{
+    position:absolute;height:4px;background:#50331c;border-radius:3px;
+    transform-origin:left center;display:none;opacity:.95
+  }
+  .aim-guide{
+    position:absolute;left:0;top:0;right:0;bottom:0;pointer-events:none;z-index:3
+  }
+  .aim-dot{
+    position:absolute;width:10px;height:10px;border-radius:50%;
+    background:rgba(255,255,255,.82);box-shadow:0 0 0 1px rgba(0,0,0,.15)
+  }
+
   .item-card{
     position:absolute;left:10px;right:10px;bottom:170px;
     margin:auto;width:min(88%,390px);
@@ -293,7 +316,7 @@
     <button class="ctrl primary" id="newBtn">New Game</button>
   </div>
 
-  <div class="footer">v0.4 • Checkout Match + Return Go-Backs</div>
+  <div class="footer">v0.5 • Checkout Match + Slingshot Go-Backs</div>
 </div>
 
 
@@ -316,7 +339,14 @@
       </div>
 
       <div class="item-card" id="gbItemCard"></div>
+      <div class="slingshot" id="gbSlingshot">
+        <div class="sling-post left"></div>
+        <div class="sling-post right"></div>
+        <div class="sling-band left" id="gbBandLeft"></div>
+        <div class="sling-band right" id="gbBandRight"></div>
+      </div>
       <div class="held-item" id="gbHeldItem">📦</div>
+      <div class="aim-guide" id="gbAimGuide"></div>
       <div class="free-throw-line"></div>
 
       <div class="colleen" aria-label="8-bit Colleen avatar wearing a blue vest">
@@ -331,8 +361,8 @@
       </div>
     </div>
 
-    <div class="gb-message" id="gbMessage">Tap the correct tote to shoot the item.</div>
-    <div class="gb-help">You get 5 throws. Each correct basket earns +1 move in Checkout Match. Good items go to Grocery or GM; defective, damaged, leaking, broken, or spoiled items go to the matching Claims tote.</div>
+    <div class="gb-message" id="gbMessage">Pull the item back like a slingshot, aim, and release toward the correct tote.</div>
+    <div class="gb-help">You get 5 throws. Pull back the item like a slingshot and release. Each correct tote hit earns +1 move in Checkout Match. Good items go to Grocery or GM; defective, damaged, leaking, broken, or spoiled items go to the matching Claims tote.</div>
     <button class="gb-close" id="gbClose">Back to Checkout</button>
   </div>
 </div>
@@ -775,6 +805,10 @@
   const gbClose = document.getElementById('gbClose');
   const gbScene = document.getElementById('gbScene');
   const gbTotes = [...document.querySelectorAll('.tote')];
+  const gbSlingshot = document.getElementById('gbSlingshot');
+  const gbBandLeft = document.getElementById('gbBandLeft');
+  const gbBandRight = document.getElementById('gbBandRight');
+  const gbAimGuide = document.getElementById('gbAimGuide');
 
   // Four destinations:
   // Grocery = good food items
@@ -806,14 +840,77 @@
   let gbCurrentItem = null;
   let gbBusy = false;
 
+  // Slingshot state
+  let gbDragging = false;
+  let gbStartPointerX = 0;
+  let gbStartPointerY = 0;
+  let gbAnchorX = 0;
+  let gbAnchorY = 0;
+  let gbCurrentDx = 0;
+  let gbCurrentDy = 0;
+
+  function getSlingAnchor() {
+    const sceneRect = gbScene.getBoundingClientRect();
+    const itemRect = gbHeldItem.getBoundingClientRect();
+    return {
+      sceneRect,
+      x: itemRect.left - sceneRect.left + itemRect.width / 2,
+      y: itemRect.top - sceneRect.top + itemRect.height / 2
+    };
+  }
+
+  function resetBandsAndGuide() {
+    gbBandLeft.style.display = 'none';
+    gbBandRight.style.display = 'none';
+    gbAimGuide.innerHTML = '';
+  }
+
+  function setBand(el, x1, y1, x2, y2) {
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const len = Math.hypot(dx, dy);
+    el.style.display = 'block';
+    el.style.width = `${len}px`;
+    el.style.left = `${x1}px`;
+    el.style.top = `${y1}px`;
+    el.style.transform = `rotate(${Math.atan2(dy, dx)}rad)`;
+  }
+
+  function drawAimGuide(vx, vy, startX, startY) {
+    gbAimGuide.innerHTML = '';
+    const g = 0.52;
+    for (let step = 1; step <= 6; step++) {
+      const t = step * 8;
+      const px = startX + vx * t;
+      const py = startY + vy * t + g * t * t;
+      const dot = document.createElement('div');
+      dot.className = 'aim-dot';
+      dot.style.left = `${px - 5}px`;
+      dot.style.top = `${py - 5}px`;
+      gbAimGuide.appendChild(dot);
+    }
+  }
+
+  function placeHeldItemAt(dx, dy) {
+    gbHeldItem.style.left = '50%';
+    gbHeldItem.style.bottom = '130px';
+    gbHeldItem.style.top = '';
+    gbHeldItem.style.transform = `translateX(calc(-50% + ${dx}px)) translateY(${dy}px) scale(1)`;
+  }
+
+  function resetHeldItemPosition() {
+    gbHeldItem.style.opacity = '1';
+    gbHeldItem.style.left = '50%';
+    gbHeldItem.style.bottom = '130px';
+    gbHeldItem.style.top = '';
+    gbHeldItem.style.transform = 'translateX(-50%) scale(1)';
+    resetBandsAndGuide();
+  }
+
   function pickGoBackItem() {
     gbCurrentItem = GO_BACK_ITEMS[Math.floor(Math.random() * GO_BACK_ITEMS.length)];
     gbHeldItem.textContent = gbCurrentItem.icon;
-    gbHeldItem.style.left = '50%';
-    gbHeldItem.style.top = '';
-    gbHeldItem.style.bottom = '130px';
-    gbHeldItem.style.transform = 'translateX(-50%) scale(1)';
-    gbHeldItem.style.opacity = '1';
+    resetHeldItemPosition();
     gbItemCard.innerHTML = `<strong>${gbCurrentItem.icon} ${gbCurrentItem.name}</strong><br><span>${gbCurrentItem.note}</span>`;
   }
 
@@ -829,60 +926,98 @@
     gbThrows = 5;
     gbCorrect = 0;
     gbBusy = false;
+    gbDragging = false;
     gbClose.classList.remove('show');
-    gbMessage.textContent = 'Tap the correct tote to shoot the item.';
+    gbClose.textContent = 'Back to Checkout';
+    gbMessage.textContent = 'Pull the item back like a slingshot, aim, and release toward the correct tote.';
     updateGoBackHUD();
     pickGoBackItem();
     goBacksOverlay.classList.add('show');
   }
 
-  function animateThrowTo(tote, wasCorrect) {
+  function findHitTote(x, y) {
+    const sceneRect = gbScene.getBoundingClientRect();
+    let winner = null;
+    let bestDist = Infinity;
+
+    gbTotes.forEach(tote => {
+      const rect = tote.getBoundingClientRect();
+      const left = rect.left - sceneRect.left;
+      const top = rect.top - sceneRect.top;
+      const right = left + rect.width;
+      const bottom = top + rect.height;
+
+      const inside = x >= left && x <= right && y >= top && y <= bottom;
+      const cx = left + rect.width / 2;
+      const cy = top + rect.height / 2;
+      const dist = Math.hypot(x - cx, y - cy);
+
+      if (inside) {
+        winner = tote;
+        bestDist = -1;
+      } else if (!winner && dist < bestDist) {
+        bestDist = dist;
+        winner = tote;
+      }
+    });
+
+    return winner;
+  }
+
+  function animateFlight(vx, vy) {
     return new Promise(resolve => {
-      const sceneRect = gbScene.getBoundingClientRect();
-      const toteRect = tote.getBoundingClientRect();
+      const { sceneRect } = getSlingAnchor();
       const itemRect = gbHeldItem.getBoundingClientRect();
+      const startX = itemRect.left - sceneRect.left + itemRect.width / 2;
+      const startY = itemRect.top - sceneRect.top + itemRect.height / 2;
 
-      const startX = itemRect.left - sceneRect.left;
-      const startY = itemRect.top - sceneRect.top;
-      const endX = toteRect.left - sceneRect.left + toteRect.width/2 - itemRect.width/2;
-      const endY = toteRect.top - sceneRect.top + toteRect.height/2 - itemRect.height/2;
+      let x = startX;
+      let y = startY;
+      let step = 0;
+      const gravity = 0.52;
+      let finished = false;
 
-      const midX = (startX + endX) / 2;
-      const midY = Math.max(18, Math.min(startY, endY) - 120);
+      function frame() {
+        if (finished) return;
+        step += 1;
+        x += vx;
+        y += vy + gravity * step;
 
-      gbHeldItem.animate([
-        {transform:'translate(0,0) rotate(0deg) scale(1)', offset:0},
-        {transform:`translate(${midX-startX}px,${midY-startY}px) rotate(180deg) scale(1.08)`, offset:.52},
-        {transform:`translate(${endX-startX}px,${endY-startY}px) rotate(360deg) scale(.62)`, offset:1}
-      ], {
-        duration:650,
-        easing:'cubic-bezier(.25,.65,.38,1)',
-        fill:'forwards'
-      }).onfinish = () => {
-        tote.classList.add(wasCorrect ? 'correct' : 'wrong');
-        setTimeout(()=>tote.classList.remove('correct','wrong'),360);
-        resolve();
-      };
+        gbHeldItem.style.left = `${x - itemRect.width / 2}px`;
+        gbHeldItem.style.top = `${y - itemRect.height / 2}px`;
+        gbHeldItem.style.bottom = 'auto';
+        gbHeldItem.style.transform = `rotate(${step * 0.18}turn) scale(${Math.max(0.7, 1 - step * 0.01)})`;
+
+        const tote = findHitTote(x, y);
+        const outBottom = y > sceneRect.height - 5;
+        const inToteZone = y < 220 && step > 8;
+
+        if (inToteZone || outBottom || step > 48) {
+          finished = true;
+          resolve(tote);
+          return;
+        }
+        requestAnimationFrame(frame);
+      }
+      requestAnimationFrame(frame);
     });
   }
 
-  async function chooseGoBackBin(tote) {
-    if (gbBusy || gbThrows <= 0 || !gbCurrentItem) return;
-    gbBusy = true;
-
-    const chosen = tote.dataset.bin;
-    const correct = chosen === gbCurrentItem.bin;
-
-    // Every shot uses one of the five throws.
-    gbThrows--;
-
-    // Each correct basket earns +1 move for the MAIN matching game.
-    if (correct) {
-      gbCorrect++;
+  async function finishThrow(hitTote) {
+    if (!hitTote || gbThrows <= 0 || !gbCurrentItem) {
+      gbBusy = false;
+      return;
     }
 
+    const chosen = hitTote.dataset.bin;
+    const correct = chosen === gbCurrentItem.bin;
+
+    gbThrows--;
+    if (correct) gbCorrect++;
     updateGoBackHUD();
-    await animateThrowTo(tote, correct);
+
+    hitTote.classList.add(correct ? 'correct' : 'wrong');
+    setTimeout(() => hitTote.classList.remove('correct', 'wrong'), 360);
 
     if (correct) {
       gbMessage.textContent = '✅ Correct! +1 move earned for Checkout Match.';
@@ -913,8 +1048,82 @@
     gbBusy = false;
   }
 
-  goBacksBtn.addEventListener('click', startGoBacks);
-  gbTotes.forEach(tote => tote.addEventListener('click', () => chooseGoBackBin(tote)));
+  gbHeldItem.addEventListener('pointerdown', e => {
+    if (gbBusy || gbThrows <= 0 || !gbCurrentItem) return;
+    gbDragging = true;
+    gbBusy = true;
+
+    const anchor = getSlingAnchor();
+    gbAnchorX = anchor.x;
+    gbAnchorY = anchor.y;
+    gbStartPointerX = e.clientX;
+    gbStartPointerY = e.clientY;
+    gbCurrentDx = 0;
+    gbCurrentDy = 0;
+
+    gbHeldItem.setPointerCapture?.(e.pointerId);
+    gbMessage.textContent = 'Pull back, aim, and release.';
+  });
+
+  gbHeldItem.addEventListener('pointermove', e => {
+    if (!gbDragging) return;
+
+    let dx = e.clientX - gbStartPointerX;
+    let dy = e.clientY - gbStartPointerY;
+
+    // Only allow pulling backward/downward-ish from the sling.
+    dx = Math.max(-95, Math.min(95, dx));
+    dy = Math.max(-30, Math.min(130, dy));
+
+    gbCurrentDx = dx;
+    gbCurrentDy = dy;
+    placeHeldItemAt(dx, dy);
+
+    const sceneRect = gbScene.getBoundingClientRect();
+    const itemRect = gbHeldItem.getBoundingClientRect();
+    const itemCenterX = itemRect.left - sceneRect.left + itemRect.width / 2;
+    const itemCenterY = itemRect.top - sceneRect.top + itemRect.height / 2;
+
+    const leftPostX = gbAnchorX - 18;
+    const rightPostX = gbAnchorX + 18;
+    const postY = gbAnchorY + 6;
+
+    setBand(gbBandLeft, leftPostX, postY, itemCenterX, itemCenterY);
+    setBand(gbBandRight, rightPostX, postY, itemCenterX, itemCenterY);
+
+    const vx = -dx * 0.14;
+    const vy = -dy * 0.14 - 3.8;
+    drawAimGuide(vx, vy, itemCenterX, itemCenterY);
+  });
+
+  async function releaseSlingshot() {
+    if (!gbDragging) return;
+    gbDragging = false;
+
+    const launchDx = gbCurrentDx;
+    const launchDy = gbCurrentDy;
+    resetBandsAndGuide();
+
+    // Small pull = cancel shot
+    if (Math.hypot(launchDx, launchDy) < 16) {
+      resetHeldItemPosition();
+      gbBusy = false;
+      return;
+    }
+
+    const vx = -launchDx * 0.14;
+    const vy = -launchDy * 0.14 - 3.8;
+    const hitTote = await animateFlight(vx, vy);
+    await finishThrow(hitTote);
+  }
+
+  gbHeldItem.addEventListener('pointerup', releaseSlingshot);
+  gbHeldItem.addEventListener('pointercancel', () => {
+    gbDragging = false;
+    resetHeldItemPosition();
+    resetBandsAndGuide();
+    if (gbBusy) gbBusy = false;
+  });
 
   gbClose.addEventListener('click', () => {
     moves += gbCorrect;
@@ -922,7 +1131,6 @@
     goBacksOverlay.classList.remove('show');
     statusEl.textContent = `Go-backs returned: +${gbCorrect} checkout move${gbCorrect === 1 ? '' : 's'}!`;
   });
-
 
   document.getElementById('newBtn').addEventListener('click', newGame);
   document.getElementById('hintBtn').addEventListener('click', showHint);
