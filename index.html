@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
-<title>Checkout Match v0.5</title>
+<title>Checkout Match v0.5.1</title>
 <style>
   :root{
     --bg:#f2eadf;
@@ -316,7 +316,7 @@
     <button class="ctrl primary" id="newBtn">New Game</button>
   </div>
 
-  <div class="footer">v0.5 • Checkout Match + Slingshot Go-Backs</div>
+  <div class="footer">v0.5.1 • Slingshot Go-Backs button fix</div>
 </div>
 
 
@@ -1124,6 +1124,8 @@
     resetBandsAndGuide();
     if (gbBusy) gbBusy = false;
   });
+
+  goBacksBtn.addEventListener('click', startGoBacks);
 
   gbClose.addEventListener('click', () => {
     moves += gbCorrect;
